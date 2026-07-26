@@ -29,7 +29,13 @@ import type {
   PostCardView,
   PostPageResult,
   PostTypeView,
+  ChangelogEntryView,
+  ChangelogQuery,
+  ChangelogResult,
+  ChangeKind,
   QueryPort,
+  RoadmapCardView,
+  RoadmapView,
   SimilarPostView,
   SimilarQuery,
   StatusChangeView,
@@ -38,13 +44,16 @@ import type {
 
 import {
   categories,
+  changelogSeeds,
   commentThreads,
   detailsTail,
+  etaByTitle,
   genericComments,
   mergedInto,
   people,
   postDetails,
   postSeeds,
+  type ChangelogSeed,
   type CommentSeed,
   type PostSeed,
 } from './seeds'
@@ -363,6 +372,75 @@ const ghosts: Ghost[] = Object.entries(mergedInto).flatMap(([targetTitle, dupes]
   }))
 })
 
+
+/* ─────────────────────────── Роадмап ─────────────────────────── */
+
+const ROADMAP_COLUMN_LIMIT = 3
+
+function boardName(slug: string): string {
+  return product.boards.find((b) => b.slug === slug)?.name ?? slug
+}
+
+function toRoadmapCard(post: MockPost): RoadmapCardView {
+  const type = postTypeByKey.get(post.seed.typeKey)
+  return {
+    slug: post.slug,
+    boardSlug: post.seed.boardSlug,
+    boardName: boardName(post.seed.boardSlug),
+    title: post.seed.title,
+    typeName: type?.name ?? post.seed.typeKey,
+    categoryName: categoryName(post.seed.boardSlug, post.seed.categorySlug),
+    count: post.seed.votes,
+    countLabel: type?.countLabel ?? ['голос', 'голоса', 'голосов'],
+    eta: etaByTitle[post.seed.title] ?? null,
+  }
+}
+
+/* ────────────────────────── Changelog ────────────────────────── */
+
+function toEntryView(seed: ChangelogSeed, now: Date): ChangelogEntryView {
+  const publishedAt = new Date(now.getTime() - seed.agoDays * MS_PER_DAY)
+
+  const closedPosts = seed.closes.flatMap((title) => {
+    const post = posts.find((p) => p.seed.title === title)
+    if (!post) return []
+    const type = postTypeByKey.get(post.seed.typeKey)
+    return [
+      {
+        slug: post.slug,
+        boardSlug: post.seed.boardSlug,
+        title: post.seed.title,
+        status: toStatusView(post.seed.statusKey),
+        count: post.seed.votes,
+        countLabel: type?.countLabel ?? ['голос', 'голоса', 'голосов'],
+      },
+    ]
+  })
+
+  return {
+    slug: seed.slug,
+    version: seed.version,
+    title: seed.title,
+    lead: seed.lead,
+    publishedAt: publishedAt.toISOString(),
+    /* Без «г.» на конце: Intl добавляет его к числовому году, в макете его нет. */
+    publishedLabel: new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+    }).format(publishedAt) + ` ${publishedAt.getFullYear()}`,
+    kinds: [...new Set(seed.changes.map((c) => c.kind))],
+    labels: seed.labels,
+    changes: seed.changes,
+    closedPosts,
+  }
+}
+
+const CHANGE_KIND_NAMES: Record<ChangeKind, string> = {
+  new: 'Новое',
+  improved: 'Улучшено',
+  fixed: 'Исправлено',
+}
+
 export const mockQueries: QueryPort = {
   async listBoards(): Promise<BoardView[]> {
     return product.boards
@@ -464,7 +542,7 @@ export const mockQueries: QueryPort = {
       author: toPerson(index * 3 + 1),
       createdAt: created.toISOString(),
       createdLabel: relativeLabel(created, now),
-      eta: post.seed.statusKey === 'building' ? 'ближайший релиз' : null,
+      eta: etaByTitle[post.seed.title] ?? null,
       statusHistory: buildStatusHistory(post, now),
       voters: buildVoters(post),
       votersTotal: post.seed.votes,
@@ -506,6 +584,104 @@ export const mockQueries: QueryPort = {
           closedReason: closedReasonFor(p),
         }
       })
+  },
+
+  async getRoadmap(boardSlug?: string, expandStatusKey?: string): Promise<RoadmapView> {
+    /* Роадмап агрегирует обращения со ВСЕХ досок (FR-151): пользователю
+       неинтересно, в какой из них лежит запрос, — интересно, что с ним будет. */
+    const pool = posts.filter(
+      (p) =>
+        isPubliclyListed(p) &&
+        (!boardSlug || p.seed.boardSlug === boardSlug),
+    )
+
+    const columns = statuses
+      .filter((s) => s.showOnRoadmap)
+      .sort((a, b) => a.position - b.position)
+      .map((status) => {
+        const items = pool
+          .filter((p) => p.seed.statusKey === status.key)
+          /* Внутри колонки — по голосам: наверху то, чего ждут сильнее всего. */
+          .sort((a, b) => b.seed.votes - a.seed.votes)
+        const expanded = status.key === expandStatusKey
+        return {
+          status: toStatusView(status.key),
+          total: items.length,
+          items: (expanded ? items : items.slice(0, ROADMAP_COLUMN_LIMIT)).map(
+            toRoadmapCard,
+          ),
+          expanded,
+        }
+      })
+
+    return {
+      columns,
+      boards: product.boards
+        .filter((b) => b.visibility === 'public')
+        .sort((a, b) => a.position - b.position)
+        .map((b) => ({ slug: b.slug, name: b.name })),
+    }
+  },
+
+  async getChangelog(query: ChangelogQuery): Promise<ChangelogResult> {
+    const now = new Date()
+    const limit = query.limit ?? 3
+
+    const all = changelogSeeds
+      .slice()
+      .sort((a, b) => a.agoDays - b.agoDays)
+      .map((seed) => toEntryView(seed, now))
+
+    const matched = all.filter(
+      (entry) =>
+        (!query.kinds.length || entry.kinds.some((k) => query.kinds.includes(k))) &&
+        (!query.labels.length || entry.labels.some((l) => query.labels.includes(l))),
+    )
+
+    let start = 0
+    if (query.cursor) {
+      const afterSlug = decodeCursor(query.cursor)
+      const at = matched.findIndex((e) => e.slug === afterSlug)
+      start = at === -1 ? 0 : at + 1
+    }
+
+    const slice = matched.slice(start, start + limit)
+    const last = slice.at(-1)
+    const hasMore = start + slice.length < matched.length
+
+    const countBy = <T extends string>(pick: (e: ChangelogEntryView) => T[]) => {
+      const map = new Map<T, number>()
+      for (const entry of all) {
+        for (const value of new Set(pick(entry))) {
+          map.set(value, (map.get(value) ?? 0) + 1)
+        }
+      }
+      return map
+    }
+
+    const kindCounts = countBy((e) => e.kinds)
+    const labelCounts = countBy((e) => e.labels)
+
+    return {
+      items: slice,
+      nextCursor: hasMore && last ? encodeCursor(last.slug) : null,
+      total: matched.length,
+      kindFacets: (Object.keys(CHANGE_KIND_NAMES) as ChangeKind[])
+        .map((kind) => ({
+          key: kind,
+          name: CHANGE_KIND_NAMES[kind],
+          count: kindCounts.get(kind) ?? 0,
+        }))
+        .filter((f) => f.count > 0),
+      labelFacets: [...labelCounts.entries()]
+        .map(([label, count]) => ({ key: label, name: label, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    }
+  },
+
+  async getChangelogEntry(slug: string): Promise<ChangelogEntryView | null> {
+    const seed = changelogSeeds.find((e) => e.slug === slug)
+    return seed ? toEntryView(seed, new Date()) : null
   },
 }
 

@@ -205,6 +205,96 @@ export interface SimilarQuery {
   title: string
 }
 
+/* ─────────────────────────── Роадмап ─────────────────────────── */
+
+/** Карточка на роадмапе (FR-153): голоса, заголовок, доска-источник, ETA. */
+export interface RoadmapCardView {
+  slug: string
+  boardSlug: string
+  boardName: string
+  title: string
+  typeName: string
+  categoryName: string | null
+  count: number
+  countLabel: [string, string, string]
+  /** Ожидаемый срок, если команда его назвала: «II квартал», «релиз 2.31». */
+  eta: string | null
+}
+
+export interface RoadmapColumnView {
+  status: StatusView
+  /** Всего в колонке — «Готово» бесконечная, поэтому нужен лимит (FR-155). */
+  total: number
+  items: RoadmapCardView[]
+  /** Колонка раскрыта целиком. */
+  expanded: boolean
+}
+
+export interface RoadmapView {
+  columns: RoadmapColumnView[]
+  boards: { slug: string; name: string }[]
+}
+
+/* ────────────────────────── Changelog ────────────────────────── */
+
+export type ChangeKind = 'new' | 'improved' | 'fixed'
+
+/**
+ * Одно изменение внутри релиза.
+ *
+ * Запись — не один markdown-блок, а список изменений со своим типом у каждого:
+ * иначе фильтр ленты по типу (FR-162) может отвечать только «в этом релизе
+ * что-то исправляли», а не показывать что именно.
+ */
+export interface ChangelogChangeView {
+  kind: ChangeKind
+  title: string
+  body: string
+}
+
+export interface ChangelogPostLink {
+  slug: string
+  boardSlug: string
+  title: string
+  status: StatusView
+  count: number
+  countLabel: [string, string, string]
+}
+
+export interface ChangelogEntryView {
+  slug: string
+  /** Версия релиза, если продукт их нумерует. */
+  version: string | null
+  title: string
+  lead: string
+  publishedAt: string
+  publishedLabel: string
+  /** Типы, встречающиеся в записи — для фильтра и бейджей в ленте. */
+  kinds: ChangeKind[]
+  labels: string[]
+  changes: ChangelogChangeView[]
+  /**
+   * Обращения, закрытые этим релизом (FR-165). Здесь замыкается цикл:
+   * их авторы и голосовавшие получают письмо «то, что вы просили, вышло».
+   */
+  closedPosts: ChangelogPostLink[]
+}
+
+export interface ChangelogQuery {
+  kinds: ChangeKind[]
+  labels: string[]
+  cursor?: string | undefined
+  limit?: number | undefined
+}
+
+export interface ChangelogResult {
+  items: ChangelogEntryView[]
+  nextCursor: string | null
+  total: number
+  kindFacets: FacetView[]
+  labelFacets: FacetView[]
+}
+
 /** Контракт. Обе реализации обязаны экспортировать ровно это. */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
@@ -212,4 +302,7 @@ export interface QueryPort {
   getFeed(query: FeedQuery): Promise<FeedResult>
   getPost(boardSlug: string, slug: string): Promise<PostPageResult | null>
   findSimilar(query: SimilarQuery): Promise<SimilarPostView[]>
+  getRoadmap(boardSlug?: string, expandStatusKey?: string): Promise<RoadmapView>
+  getChangelog(query: ChangelogQuery): Promise<ChangelogResult>
+  getChangelogEntry(slug: string): Promise<ChangelogEntryView | null>
 }

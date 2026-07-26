@@ -251,6 +251,22 @@ Unique: `(board_id, parent_id, name)`.
 | `scheduled_for` | timestamptz, nullable | FR-166 |
 | `reaction_counts` | jsonb | |
 
+### changelog_change
+
+Запись релиза — не один markdown-блок, а список изменений, у каждого свой тип.
+Иначе фильтр ленты по типу (FR-162) может ответить только «в этом релизе что-то
+исправляли», но не показать что именно, — а именно за этим на страницу и приходят.
+
+| Поле | Тип | Заметки |
+|---|---|---|
+| `entry_id` | uuid → changelog_entry | |
+| `kind` | enum(`new`,`improved`,`fixed`) | |
+| `title` / `body` | text | |
+| `position` | int | порядок внутри записи |
+
+`changelog_entry.types` при этом остаётся, но становится производным полем:
+это набор `kind` его изменений, денормализованный для фильтра ленты.
+
 `changelog_post (entry_id, post_id)` — связь релиза с постами (FR-165).
 
 ### backlog_item
