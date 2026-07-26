@@ -11,6 +11,11 @@ import { product } from '@config/product'
 import { statuses, statusByKey } from '@config/statuses'
 import { postTypes, postTypeByKey } from '@config/post-types'
 import type { Privacy } from '@config/post-types'
+import {
+  isSearchable,
+  SIMILARITY_THRESHOLD,
+  wordSimilarity,
+} from '@/core/domain/intake/similar'
 import { trendScore } from '@/core/domain/shared/trending'
 import { relativeLabel } from '@/core/format'
 import { slugify } from '@/core/slug'
@@ -25,6 +30,8 @@ import type {
   PostPageResult,
   PostTypeView,
   QueryPort,
+  SimilarPostView,
+  SimilarQuery,
   StatusChangeView,
   StatusView,
 } from '@/queries/types'
@@ -369,6 +376,8 @@ export const mockQueries: QueryPort = {
         postCount: posts.filter(
           (p) => p.seed.boardSlug === b.slug && isPubliclyListed(p),
         ).length,
+        categories: categories[b.slug] ?? [],
+        requireCategory: b.requireCategory ?? false,
       }))
   },
 
@@ -470,4 +479,49 @@ export const mockQueries: QueryPort = {
       subscribed: false,
     }
   },
+
+  async findSimilar(query: SimilarQuery): Promise<SimilarPostView[]> {
+    if (!isSearchable(query.title)) return []
+    const now = new Date()
+
+    /* Ищем по всей доске, а не только среди обращений того же типа: человек
+       часто заводит багом то, что уже лежит идеей, и наоборот (FR-505). */
+    return posts
+      .filter((p) => p.seed.boardSlug === query.boardSlug && isPubliclyListed(p))
+      .map((p) => ({ post: p, score: wordSimilarity(query.title, p.seed.title) }))
+      .filter(({ score }) => score >= SIMILARITY_THRESHOLD)
+      .sort((a, b) => b.score - a.score || b.post.seed.votes - a.post.seed.votes)
+      .slice(0, 4)
+      .map(({ post: p }) => {
+        const card = toCardView(p, now)
+        return {
+          slug: card.slug,
+          boardSlug: card.boardSlug,
+          title: card.title,
+          status: card.status,
+          type: card.type,
+          count: card.count,
+          commentCount: card.commentCount,
+          voted: card.voted,
+          closedReason: closedReasonFor(p),
+        }
+      })
+  },
+}
+
+/**
+ * Публичная причина отказа по ранее закрытому обращению (FR-643). В фазе B
+ * она придёт из `post.resolution_reason_public`, здесь — из статуса.
+ */
+function closedReasonFor(post: MockPost): string | null {
+  switch (post.seed.statusKey) {
+    case 'wont-fix':
+      return 'Мы отказались от этого: решение ломает разграничение доступа между филиалами.'
+    case 'not-reproducible':
+      return 'Не удалось воспроизвести. Если у вас повторяется — напишите шаги, откроем заново.'
+    case 'duplicate':
+      return 'Это обращение объединено с другим.'
+    default:
+      return null
+  }
 }

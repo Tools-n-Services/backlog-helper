@@ -35,6 +35,10 @@ export interface BoardView {
   description: string
   visibility: 'public' | 'private' | 'readonly'
   postCount: number
+  /** Категории доски целиком — форме нужны все, а не только непустые. */
+  categories: { slug: string; name: string }[]
+  /** Категория обязательна при создании обращения (FR-121). */
+  requireCategory: boolean
 }
 
 /** Карточка обращения в ленте (FR-118). */
@@ -177,10 +181,35 @@ export type PostPageResult =
   | ({ kind: 'post' } & PostDetailView)
   | ({ kind: 'merged' } & PostMergedView)
 
+/** Кандидат во врезке «похожие найдены» (FR-122). */
+export interface SimilarPostView {
+  slug: string
+  boardSlug: string
+  title: string
+  status: StatusView
+  type: PostTypeView
+  count: number
+  commentCount: number
+  voted: boolean
+  /**
+   * Публичная причина отказа, если обращение уже закрывали как
+   * «не будем делать». Показывать её обязательно: лучший дубликат — тот,
+   * который не создали (FR-643).
+   */
+  closedReason: string | null
+}
+
+export interface SimilarQuery {
+  boardSlug: string
+  typeKey: string
+  title: string
+}
+
 /** Контракт. Обе реализации обязаны экспортировать ровно это. */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
   getBoard(slug: string): Promise<BoardView | null>
   getFeed(query: FeedQuery): Promise<FeedResult>
   getPost(boardSlug: string, slug: string): Promise<PostPageResult | null>
+  findSimilar(query: SimilarQuery): Promise<SimilarPostView[]>
 }
