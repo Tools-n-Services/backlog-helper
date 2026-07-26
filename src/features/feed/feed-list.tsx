@@ -15,9 +15,11 @@ import { loadMoreFeed } from './actions'
 export function FeedList({
   query,
   initial,
+  signedIn,
 }: {
   query: FeedQuery
   initial: FeedPage
+  signedIn: boolean
 }) {
   const [items, setItems] = useState<PostCardView[]>(initial.items)
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor)
@@ -45,7 +47,7 @@ export function FeedList({
       <ul className="space-y-2.5">
         {items.map((post) => (
           <li key={post.id}>
-            <PostCard post={post} />
+            <PostCard post={post} signedIn={signedIn} />
           </li>
         ))}
       </ul>

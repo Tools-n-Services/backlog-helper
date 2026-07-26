@@ -16,16 +16,31 @@ import { relativeLabel } from '@/core/format'
 import { slugify } from '@/core/slug'
 import type {
   BoardView,
+  CommentView,
   FacetView,
   FeedQuery,
   FeedResult,
+  PersonView,
   PostCardView,
+  PostPageResult,
   PostTypeView,
   QueryPort,
+  StatusChangeView,
   StatusView,
 } from '@/queries/types'
 
-import { categories, postSeeds, type PostSeed } from './seeds'
+import {
+  categories,
+  commentThreads,
+  detailsTail,
+  genericComments,
+  mergedInto,
+  people,
+  postDetails,
+  postSeeds,
+  type CommentSeed,
+  type PostSeed,
+} from './seeds'
 
 const MS_PER_DAY = 86_400_000
 /** Больше этого числа отметок о голосах не храним: вклад в сумму масштабируем. */
@@ -212,6 +227,135 @@ function facetsFor(
   }
 }
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function toPerson(index: number): PersonView {
+  const person = people[index % people.length]!
+  return {
+    name: person.name,
+    initials: initials(person.name),
+    role: person.role,
+    isTeam: person.team ?? false,
+  }
+}
+
+/** Человекочитаемая ссылка: её называют в поддержке и в письмах. */
+function refFor(index: number): string {
+  return `RTM-${4000 + index * 37}`
+}
+
+/**
+ * Цепочка статусов, через которые обращение прошло к текущему.
+ * В фазе B её заменит таблица status_change — форма данных та же.
+ */
+const STATUS_CHAINS: Record<string, string[]> = {
+  open: ['open'],
+  'needs-info': ['needs-info', 'open'],
+  planned: ['planned', 'open'],
+  building: ['building', 'planned', 'open'],
+  completed: ['completed', 'building', 'planned', 'open'],
+  'not-reproducible': ['not-reproducible', 'needs-info', 'open'],
+  duplicate: ['duplicate', 'open'],
+  'wont-fix': ['wont-fix', 'open'],
+}
+
+function buildStatusHistory(post: MockPost, now: Date): StatusChangeView[] {
+  const chain = STATUS_CHAINS[post.seed.statusKey] ?? [post.seed.statusKey]
+  const span = post.createdAgoDays - post.updatedAgoDays
+  return chain.map((key, i) => {
+    const ago = post.updatedAgoDays + (span * i) / Math.max(1, chain.length - 1)
+    const at = new Date(now.getTime() - ago * MS_PER_DAY)
+    return {
+      status: toStatusView(key),
+      label: relativeLabel(at, now),
+      /* Кто сменил статус, известно только для командных переходов. */
+      byName: i === 0 && key !== 'open' ? toPerson(9).name : null,
+    }
+  })
+}
+
+function buildComments(post: MockPost, now: Date): CommentView[] {
+  const rand = mulberry32(post.seed.title.length * 104729 + 7)
+  const at = (agoDays: number) => new Date(now.getTime() - agoDays * MS_PER_DAY)
+
+  const fromSeed = (seed: CommentSeed, path: string): CommentView => {
+    const when = at(seed.agoDays)
+    return {
+      id: `${post.id}-c${path}`,
+      author: toPerson(seed.author),
+      createdAt: when.toISOString(),
+      createdLabel: relativeLabel(when, now),
+      body: seed.body,
+      likeCount: seed.likes,
+      pinned: seed.pinned ?? false,
+      replies: (seed.replies ?? []).map((r, i) => fromSeed(r, `${path}-${i}`)),
+    }
+  }
+
+  const handwritten = commentThreads[post.seed.title]
+  if (handwritten) return handwritten.map((c, i) => fromSeed(c, String(i)))
+
+  const count = Math.min(post.seed.comments, 4)
+  return Array.from({ length: count }, (_, i) => {
+    const agoDays = post.updatedAgoDays + rand() * Math.max(1, post.createdAgoDays - post.updatedAgoDays)
+    const when = at(agoDays)
+    return {
+      id: `${post.id}-c${i}`,
+      author: toPerson(Math.floor(rand() * (people.length - 2))),
+      createdAt: when.toISOString(),
+      createdLabel: relativeLabel(when, now),
+      body: genericComments[Math.floor(rand() * genericComments.length)]!,
+      likeCount: Math.floor(rand() * 12),
+      pinned: false,
+      replies: [],
+    }
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+function buildVoters(post: MockPost): PersonView[] {
+  const rand = mulberry32(post.seed.votes + 31)
+  const shown = Math.min(post.seed.votes, 5)
+  const picked = new Set<number>()
+  while (picked.size < shown) picked.add(Math.floor(rand() * (people.length - 2)))
+  return [...picked].map(toPerson)
+}
+
+function detailsFor(post: MockPost): string[] {
+  return postDetails[post.seed.title] ?? [post.seed.excerpt, detailsTail]
+}
+
+/**
+ * Смерженные дубликаты как самостоятельные адреса: по их ссылке из письма
+ * или из выдачи пользователь обязан попасть на целевое обращение, а не в 404.
+ */
+interface Ghost {
+  slug: string
+  title: string
+  ref: string
+  boardSlug: string
+  targetSlug: string
+  targetTitle: string
+}
+
+const ghosts: Ghost[] = Object.entries(mergedInto).flatMap(([targetTitle, dupes]) => {
+  const target = posts.find((p) => p.seed.title === targetTitle)
+  if (!target) return []
+  return dupes.map((d, i) => ({
+    slug: slugify(d.title),
+    title: d.title,
+    ref: `RTM-${5000 + i * 131}`,
+    boardSlug: target.seed.boardSlug,
+    targetSlug: target.slug,
+    targetTitle,
+  }))
+})
+
 export const mockQueries: QueryPort = {
   async listBoards(): Promise<BoardView[]> {
     return product.boards
@@ -276,6 +420,54 @@ export const mockQueries: QueryPort = {
       nextCursor: hasMore && last ? encodeCursor(last.id) : null,
       total: sorted.length,
       facets: facetsFor(pool, query),
+    }
+  },
+
+  async getPost(boardSlug: string, slug: string): Promise<PostPageResult | null> {
+    const ghost = ghosts.find((g) => g.boardSlug === boardSlug && g.slug === slug)
+    if (ghost) {
+      return {
+        kind: 'merged',
+        title: ghost.title,
+        target: {
+          boardSlug: ghost.boardSlug,
+          slug: ghost.targetSlug,
+          title: ghost.targetTitle,
+        },
+      }
+    }
+
+    const index = posts.findIndex(
+      (p) => p.seed.boardSlug === boardSlug && p.slug === slug,
+    )
+    if (index === -1) return null
+
+    const post = posts[index]!
+    const now = new Date()
+    const created = new Date(now.getTime() - post.createdAgoDays * MS_PER_DAY)
+    const dupes = mergedInto[post.seed.title] ?? []
+
+    return {
+      kind: 'post',
+      ...toCardView(post, now),
+      ref: refFor(index),
+      details: detailsFor(post),
+      author: toPerson(index * 3 + 1),
+      createdAt: created.toISOString(),
+      createdLabel: relativeLabel(created, now),
+      eta: post.seed.statusKey === 'building' ? 'ближайший релиз' : null,
+      statusHistory: buildStatusHistory(post, now),
+      voters: buildVoters(post),
+      votersTotal: post.seed.votes,
+      votersHidden: !product.features.voterList,
+      merged: dupes.map((d, i) => ({
+        title: d.title,
+        slug: slugify(d.title),
+        ref: `RTM-${5000 + i * 131}`,
+        movedVotes: d.movedVotes,
+      })),
+      comments: buildComments(post, now),
+      subscribed: false,
     }
   },
 }

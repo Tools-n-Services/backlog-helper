@@ -11,6 +11,7 @@ import {
   hasAnyFilter,
   parseFeedQuery,
 } from '@/features/feed/query-params'
+import { getViewer } from '@/core/session'
 import { queries } from '@/queries'
 import { EmptyState } from '@/ui/feed/empty-state'
 import { SortTabs } from '@/ui/feed/sort-tabs'
@@ -98,7 +99,12 @@ export default async function BoardPage({
           ) : (
             /* key по запросу: список накапливается в useState, и без ремонтирования
                смена фильтра оставила бы на экране прошлую выборку. */
-            <FeedList key={feedHref(query)} query={query} initial={feed} />
+            <FeedList
+              key={feedHref(query)}
+              query={query}
+              initial={feed}
+              signedIn={getViewer().signedIn}
+            />
           )}
         </section>
       </div>

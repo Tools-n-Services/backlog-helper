@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { formatCount, plural } from '@/core/content'
 import { Chip } from '@/ui/primitives/chip'
 import { StatusBadge } from '@/ui/primitives/status-badge'
-import { VoteBlock } from '@/ui/primitives/vote-block'
+import { VoteControl } from '@/features/post/vote-control'
 import type { PostCardView } from '@/queries/types'
 
 /**
@@ -11,10 +11,21 @@ import type { PostCardView } from '@/queries/types'
  * категория, счётчик комментариев, признак приватности и закрепления.
  * Голосовать можно прямо из ленты, без перехода в обращение.
  */
-export function PostCard({ post }: { post: PostCardView }) {
+export function PostCard({
+  post,
+  signedIn,
+}: {
+  post: PostCardView
+  signedIn: boolean
+}) {
   return (
     <article className="flex gap-4 rounded-card border border-line bg-surface p-4 transition-shadow hover:shadow-flat">
-      <VoteBlock count={post.count} type={post.type} voted={post.voted} />
+      <VoteControl
+        count={post.count}
+        type={post.type}
+        voted={post.voted}
+        signedIn={signedIn}
+      />
 
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">

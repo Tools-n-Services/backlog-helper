@@ -105,9 +105,82 @@ export interface FeedResult extends FeedPage {
   facets: FeedFacets
 }
 
+export interface PersonView {
+  name: string
+  /** Инициалы для аватара-заглушки. */
+  initials: string
+  role: string
+  /** Сотрудник команды: его комментарии визуально отличаются (FR-137). */
+  isTeam: boolean
+}
+
+/** Комментарий с одним уровнем вложенности ответов (FR-136). */
+export interface CommentView {
+  id: string
+  author: PersonView
+  createdAt: string
+  createdLabel: string
+  body: string
+  likeCount: number
+  /** Команда прибивает свой ответ наверх треда (FR-138). */
+  pinned: boolean
+  replies: CommentView[]
+}
+
+/** Запись истории статусов (FR-140). */
+export interface StatusChangeView {
+  status: StatusView
+  label: string
+  byName: string | null
+}
+
+/** Обращение, смерженное в это (FR-141). */
+export interface MergedPostView {
+  title: string
+  slug: string
+  ref: string
+  movedVotes: number
+}
+
+export interface PostDetailView extends PostCardView {
+  /** Человекочитаемая ссылка для поддержки: «RTM-4821». */
+  ref: string
+  /** Тело обращения абзацами. */
+  details: string[]
+  author: PersonView
+  createdAt: string
+  createdLabel: string
+  /** Ожидаемая дата выхода, если задана командой (FR-134). */
+  eta: string | null
+  statusHistory: StatusChangeView[]
+  /** Первые аватары списка голосовавших (FR-133). */
+  voters: PersonView[]
+  votersTotal: number
+  /** Скрыт настройкой приватности продукта. */
+  votersHidden: boolean
+  merged: MergedPostView[]
+  comments: CommentView[]
+  /** Подписан ли текущий пользователь на обновления (FR-142). */
+  subscribed: boolean
+}
+
+/**
+ * Смерженное обращение не открывается молча: пользователю показывается,
+ * куда и почему его перенесли (07-ui-brief.md, раздел 5).
+ */
+export interface PostMergedView {
+  title: string
+  target: { boardSlug: string; slug: string; title: string }
+}
+
+export type PostPageResult =
+  | ({ kind: 'post' } & PostDetailView)
+  | ({ kind: 'merged' } & PostMergedView)
+
 /** Контракт. Обе реализации обязаны экспортировать ровно это. */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
   getBoard(slug: string): Promise<BoardView | null>
   getFeed(query: FeedQuery): Promise<FeedResult>
+  getPost(boardSlug: string, slug: string): Promise<PostPageResult | null>
 }
