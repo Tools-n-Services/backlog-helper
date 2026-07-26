@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#F3F3F2;}
+body{font-family:'Geologica','Segoe UI',sans-serif;color:#0A0A0A;-webkit-font-smoothing:antialiased;}
+a{color:#0A0A0A;text-decoration:none;}
+a:hover{color:#5C5C5C;}
+*{box-sizing:border-box;}
+@keyframes skl{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="max-width:1420px;margin:0 auto;padding:56px 40px 96px;">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:40px;flex-wrap:wrap;border-bottom:2px solid #0A0A0A;padding-bottom:28px;margin-bottom:36px;">
+    <div style="max-width:48ch;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <span style="width:12px;height:12px;border-radius:999px;background:#0A0A0A;display:inline-block;"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5C5C5C;">Поверхность · public · состояния</span>
+      </div>
+      <h1 style="font-weight:300;font-size:50px;line-height:1.02;letter-spacing:-0.03em;margin:0 0 18px;">Состояния <span style="font-weight:800;">публичных экранов</span></h1>
+      <p style="font-size:16px;line-height:1.6;color:#5C5C5C;margin:0;">Каждое состояние — с действием, которое из него выводит, и с текстом причины. Иллюстраций нет намеренно: в пустом состоянии работает кнопка, а не картинка.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8C8C;text-align:right;">
+      <span>СОСТОЯНИЙ · 16</span>
+      <span>ИСТОЧНИК · бриф, разделы 4–5</span>
+      <span>ПРОВЕРКА · оттенки серого</span>
+    </div>
+  </div>
+
+  <div data-screen-label="Пустые состояния" style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">A · Пусто</span>
+      <span style="flex:1;height:1px;background:#E1E1E0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;">первый запуск и результат фильтра — разные экраны с разными действиями</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">A1 · доска без обращений</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:52px 40px;text-align:center;">
+          <h3 style="font-weight:300;font-size:24px;line-height:1.14;letter-spacing:-0.02em;margin:0 auto 12px;max-width:24ch;">Здесь пока <span style="font-weight:800;">ничего нет</span></h3>
+          <p style="font-size:14.5px;line-height:1.6;color:#5C5C5C;margin:0 auto 22px;max-width:44ch;">Доска «API и интеграции» только открылась. Первое обращение задаёт тон остальным — опишите проблему подробно, с версией и шагами.</p>
+          <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">Создать обращение</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #E1E1E0;color:#262626;font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Смотреть другие доски</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">A2 · фильтр ничего не нашёл</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:0;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:9px;padding:14px 18px;border-bottom:1px solid #E1E1E0;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#5C5C5C;">Найдено</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">0</span>
+            <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;background:#EFEFEE;color:#262626;padding:4px 6px 4px 11px;border-radius:999px;">Не воспроизводится<span style="width:15px;height:15px;border-radius:999px;background:#E1E1E0;color:#5C5C5C;display:flex;align-items:center;justify-content:center;"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg></span></span>
+            <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;background:#EFEFEE;color:#262626;padding:4px 6px 4px 11px;border-radius:999px;">Вопрос<span style="width:15px;height:15px;border-radius:999px;background:#E1E1E0;color:#5C5C5C;display:flex;align-items:center;justify-content:center;"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg></span></span>
+          </div>
+          <div style="padding:44px 40px;text-align:center;">
+            <h3 style="font-weight:700;font-size:19px;margin:0 0 10px;">Под эти фильтры ничего не подошло</h3>
+            <p style="font-size:14.5px;line-height:1.6;color:#5C5C5C;margin:0 auto 20px;max-width:42ch;">В доске 14 926 обращений — попробуйте снять фильтр по типу: вопросов со статусом «не воспроизводится» не бывает.</p>
+            <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">Сбросить фильтры</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #E1E1E0;color:#262626;font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Создать обращение</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-screen-label="Загрузка и ошибка сети" style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">B · Загрузка и ошибка сети</span>
+      <span style="flex:1;height:1px;background:#E1E1E0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;">скелет сохраняет форму ленты · спиннер запрещён</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;">
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">B1 · скелет ленты</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border-bottom:1px solid #E1E1E0;">
+            <span style="height:12px;width:120px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out infinite;display:block;"></span>
+            <span style="height:28px;width:230px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .1s infinite;display:block;"></span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:18px;padding:20px;border-bottom:1px solid #E1E1E0;">
+            <span style="flex:none;width:62px;height:58px;border-radius:8px;background:#EFEFEE;animation:skl 1.4s ease-in-out .1s infinite;display:block;"></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:9px;">
+              <div style="display:flex;gap:8px;"><span style="height:18px;width:54px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .15s infinite;display:block;"></span><span style="height:18px;width:82px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .2s infinite;display:block;"></span></div>
+              <span style="height:16px;width:72%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .25s infinite;display:block;"></span>
+              <span style="height:11px;width:96%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .3s infinite;display:block;"></span>
+              <span style="height:11px;width:64%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .35s infinite;display:block;"></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:18px;padding:20px;border-bottom:1px solid #E1E1E0;">
+            <span style="flex:none;width:62px;height:58px;border-radius:8px;background:#EFEFEE;animation:skl 1.4s ease-in-out .2s infinite;display:block;"></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:9px;">
+              <div style="display:flex;gap:8px;"><span style="height:18px;width:54px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .25s infinite;display:block;"></span><span style="height:18px;width:104px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .3s infinite;display:block;"></span></div>
+              <span style="height:16px;width:84%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .35s infinite;display:block;"></span>
+              <span style="height:11px;width:90%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .4s infinite;display:block;"></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:18px;padding:20px;">
+            <span style="flex:none;width:62px;height:58px;border-radius:8px;background:#EFEFEE;animation:skl 1.4s ease-in-out .3s infinite;display:block;"></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:9px;">
+              <div style="display:flex;gap:8px;"><span style="height:18px;width:54px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .35s infinite;display:block;"></span><span style="height:18px;width:76px;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .4s infinite;display:block;"></span></div>
+              <span style="height:16px;width:66%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .45s infinite;display:block;"></span>
+              <span style="height:11px;width:88%;border-radius:999px;background:#EFEFEE;animation:skl 1.4s ease-in-out .5s infinite;display:block;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">B2 · ошибка сети</div>
+          <div style="border:1px solid #E1E1E0;border-radius:4px;padding:36px 30px;text-align:center;">
+            <span style="width:52px;height:52px;border-radius:999px;border:1.5px solid #D14343;color:#D14343;display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8.5a13 13 0 0116 0"></path><path d="M7 12.5a9 9 0 0110 0"></path><path d="M12 18v.4"></path><path d="M3 3l18 18"></path></svg></span>
+            <h3 style="font-weight:700;font-size:18px;margin:0 0 10px;">Лента не загрузилась</h3>
+            <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 auto 18px;max-width:38ch;">Сервер не ответил за 10 секунд. Обращения на месте — не загрузился только список.</p>
+            <div style="display:flex;justify-content:center;gap:12px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">Повторить</span>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8C8C8C;margin-top:16px;">код 504 · попытка 2 из 3</div>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;flex:1;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">B3 · частичный сбой</div>
+          <div style="border:1px solid #E1E1E0;border-radius:4px;padding:16px 18px;display:flex;align-items:flex-start;gap:12px;">
+            <span style="width:26px;height:26px;border-radius:999px;background:#FBF1DF;color:#8A5D12;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 7v6M12 16.5v.5"></path></svg></span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:5px;">Счётчики голосов могут отставать</div>
+              <p style="font-size:13px;line-height:1.5;color:#5C5C5C;margin:0;">Обновляем их с задержкой около минуты. Голос учтён — число догонит.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-screen-label="Нет прав и модерация" style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">C · Нет прав, модерация, лимит, блокировка</span>
+      <span style="flex:1;height:1px;background:#E1E1E0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;">отказ всегда с причиной и следующим шагом</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">C1 · приватная доска</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:40px 34px;text-align:center;">
+          <span style="width:52px;height:52px;border-radius:999px;border:1.5px solid #0A0A0A;display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2"></rect><path d="M8 10.5V7a4 4 0 018 0v3.5"></path></svg></span>
+          <h3 style="font-weight:700;font-size:19px;margin:0 0 10px;">Доска закрыта</h3>
+          <p style="font-size:14.5px;line-height:1.6;color:#5C5C5C;margin:0 auto 20px;max-width:40ch;">Доска «Корпоративные клиенты» доступна только сотрудникам компаний с платным тарифом. Если у вас есть доступ — войдите под рабочей почтой.</p>
+          <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">Войти</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #E1E1E0;color:#262626;font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Открытые доски</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">C2 · на модерации · видит только автор</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;overflow:hidden;">
+          <div style="background:#FAFAF9;border-bottom:1px solid #E1E1E0;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;">
+            <span style="width:26px;height:26px;border-radius:999px;border:1.5px dashed #8C8C8C;color:#5C5C5C;display:flex;align-items:center;justify-content:center;flex:none;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path></svg></span>
+            <div style="flex:1;">
+              <div style="font-size:13.5px;font-weight:700;margin-bottom:4px;">Обращение видно только вам</div>
+              <p style="font-size:12.5px;line-height:1.5;color:#5C5C5C;margin:0;">Первое обращение с нового аккаунта проходит проверку. Обычно это занимает несколько часов в рабочее время.</p>
+            </div>
+          </div>
+          <div style="padding:22px 20px;">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap;">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#262626;border:1.5px solid #E1E1E0;padding:3px 10px 3px 8px;border-radius:999px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 00-3.5 10.9V17h7v-3.1A6 6 0 0012 3z"></path><path d="M10 20h4"></path></svg>Идея</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:#5C5C5C;border:1.5px dashed #BDBDBD;padding:2.5px 11px 2.5px 8px;border-radius:999px;"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="4"></circle><path d="M6 4v2l1.4 1"></path></svg>На модерации</span>
+              <span style="font-size:12px;color:#8C8C8C;">отправлено 20 минут назад</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;line-height:1.35;margin-bottom:8px;">Напоминание о незакрытом графике за три дня до начала месяца</div>
+            <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 16px;">Управляющие забывают закрыть график, и сотрудники узнают смены в последний день. Хочется автоматическое напоминание.</p>
+            <div style="display:flex;align-items:center;gap:12px;padding-top:14px;border-top:1px solid #E1E1E0;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #E1E1E0;color:#262626;font-size:13.5px;font-weight:700;padding:9px 18px;border-radius:999px;cursor:pointer;">Редактировать</span>
+              <span style="font-size:13px;color:#8C8C8C;">Голосование откроется после проверки</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">C3 · лимит превышен · FR-126</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:36px 30px;">
+          <span style="width:52px;height:52px;border-radius:999px;background:#FBF1DF;color:#8A5D12;display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></span>
+          <h3 style="font-weight:700;font-size:18px;margin:0 0 10px;">Пять обращений за час — предел</h3>
+          <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 8px;max-width:44ch;">Ограничение защищает портал от потока дублей. Следующее обращение можно создать через 38 минут — черновик сохранён, он не потеряется.</p>
+          <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 20px;max-width:44ch;">Если проблема срочная, напишите в поддержку — там ограничения нет.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #0A0A0A;font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Написать в поддержку</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#5C5C5C;padding:11px 12px;border-radius:999px;cursor:pointer;">К моим черновикам</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">C4 · аккаунт заблокирован</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:36px 30px;">
+          <span style="width:52px;height:52px;border-radius:999px;background:#F7ECEC;color:#8A3F3F;display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M6.5 6.5l11 11"></path></svg></span>
+          <h3 style="font-weight:700;font-size:18px;margin:0 0 10px;">Аккаунт заблокирован</h3>
+          <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 8px;max-width:44ch;">Причина: 14 обращений с одинаковым текстом за сутки. Читать портал можно, создавать обращения, голосовать и комментировать — нет.</p>
+          <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 20px;max-width:44ch;">Блокировка снимается вручную. Напишите, если считаете её ошибкой — разберёмся за один рабочий день.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">Оспорить блокировку</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-screen-label="Смержено и 404" style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">D · Смержено и 404</span>
+      <span style="flex:1;height:1px;background:#E1E1E0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;">переход с пояснением, а не молчаливый редирект</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:20px;">
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">D1 · обращение объединено с другим</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;overflow:hidden;">
+          <div style="background:#0A0A0A;color:#FFFFFF;padding:16px 20px;display:flex;align-items:flex-start;gap:12px;">
+            <span style="width:26px;height:26px;border-radius:999px;background:#FFFFFF;color:#0A0A0A;display:flex;align-items:center;justify-content:center;flex:none;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:5px;">Это обращение объединено с другим</div>
+              <p style="font-size:13px;line-height:1.5;margin:0;opacity:0.7;">RTM-5140 «Ночные смены в выгрузке считаются дважды» — тот же баг, что и ниже. Ваши 47 голосов и 6 комментариев перенесены, подписка на обновления сохранена.</p>
+            </div>
+          </div>
+          <div style="padding:24px 20px;">
+            <div style="display:flex;align-items:flex-start;gap:18px;">
+              <div style="flex:none;width:62px;border:1.5px solid #E1E1E0;border-radius:8px;padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;">214</span>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;flex-wrap:wrap;">
+                  <span style="display:inline-flex;align-items:center;gap:7px;background:#E4F1EF;color:#155F55;font-size:11.5px;font-weight:600;padding:4px 11px 4px 8px;border-radius:999px;"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="4"></circle><path d="M6 2a4 4 0 014 4H6z" fill="currentColor" stroke="none"></path></svg>В работе</span>
+                  <span style="font-size:12px;color:#8C8C8C;">RTM-4821 · релиз 2.31</span>
+                </div>
+                <div style="font-size:17px;font-weight:700;line-height:1.3;margin-bottom:8px;">Экспорт графика в Excel теряет ночные смены</div>
+                <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 14px;">Обсуждение продолжается здесь — 31 комментарий, последний ответ команды три дня назад.</p>
+                <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:13.5px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Перейти к обращению</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:26px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:20px;">D2 · страница не найдена</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:44px 34px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;letter-spacing:-0.04em;line-height:1;margin-bottom:20px;">404</div>
+          <h3 style="font-weight:700;font-size:19px;margin:0 0 10px;">Такой страницы нет</h3>
+          <p style="font-size:14.5px;line-height:1.6;color:#5C5C5C;margin:0 0 22px;max-width:38ch;">Обращение могли удалить, или в ссылке опечатка. Если вы перешли из письма — найдите обращение поиском по названию.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#0A0A0A;color:#FFFFFF;font-size:14px;font-weight:700;padding:11px 22px;border-radius:999px;cursor:pointer;">На главную</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #E1E1E0;color:#262626;font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;cursor:pointer;">Поиск</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-screen-label="Кнопка голоса и поиск похожих" style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;">E · Компоненты и их состояния</span>
+      <span style="flex:1;height:1px;background:#E1E1E0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;">кнопка голоса · поиск похожих · отписка</span>
+    </div>
+    <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:30px 32px;margin-bottom:20px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:22px;">E1 · кнопка голоса — шесть состояний</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:18px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px solid #E1E1E0;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">213</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Обычная</div><div style="font-size:11.5px;color:#8C8C8C;">можно голосовать</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px solid #0A0A0A;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">213</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Наведение</div><div style="font-size:11.5px;color:#8C8C8C;">рамка темнеет</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px solid #0A0A0A;background:#0A0A0A;color:#FFFFFF;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">214</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Проголосовано</div><div style="font-size:11.5px;color:#8C8C8C;">галка + заливка</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px solid #0A0A0A;background:#0A0A0A;color:#FFFFFF;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;opacity:0.6;">
+            <span style="width:13px;height:13px;border-radius:999px;border:2px solid rgba(255,255,255,0.4);border-top-color:#FFFFFF;display:inline-block;"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">214</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Отправка</div><div style="font-size:11.5px;color:#8C8C8C;">число уже выросло</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px dashed #8C8C8C;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C5C" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8.5 11V8a3.5 3.5 0 017 0v3"></path></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#5C5C5C;font-variant-numeric:tabular-nums;">213</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Не авторизован</div><div style="font-size:11.5px;color:#8C8C8C;">ведёт на вход</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:66px;border:1.5px solid #EFEFEE;background:#FAFAF9;border-radius:8px;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#BDBDBD;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div style="text-align:center;"><div style="font-size:12.5px;font-weight:700;">Голосование выключено</div><div style="font-size:11.5px;color:#8C8C8C;">тип «баг»</div></div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding-top:18px;border-top:1px solid #E1E1E0;font-size:13px;line-height:1.55;color:#5C5C5C;">У багов голосование выключено намеренно: значим охват и частота, а не желание. Вместо голоса там кнопка «Тоже сталкиваюсь» с тем же счётчиком, но другим смыслом в отчётах.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:30px 32px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:22px;">E2 · поиск похожих — четыре состояния</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="border:1px solid #E1E1E0;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;width:52px;flex:none;">пусто</span>
+            <span style="flex:1;font-size:13.5px;color:#8C8C8C;">Начните вводить — поищем похожие обращения</span>
+          </div>
+          <div style="border:1px solid #E1E1E0;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;width:52px;flex:none;">ищем</span>
+            <span style="width:14px;height:14px;border-radius:999px;border:2px solid #E1E1E0;border-top-color:#0A0A0A;display:inline-block;flex:none;"></span>
+            <span style="flex:1;font-size:13.5px;color:#262626;">Ищем похожие…</span>
+          </div>
+          <div style="border:1.5px solid #0A0A0A;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;width:52px;flex:none;">найдены</span>
+            <span style="flex:1;font-size:13.5px;font-weight:700;">Похоже, об этом уже писали — 2 обращения</span>
+            <span style="font-size:12.5px;color:#8C8C8C;flex:none;">развернуть</span>
+          </div>
+          <div style="border:1px solid #E1E1E0;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C8C8C;width:52px;flex:none;">нет</span>
+            <span style="width:20px;height:20px;border-radius:999px;background:#EFEFEE;color:#5C5C5C;display:flex;align-items:center;justify-content:center;flex:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span>
+            <span style="flex:1;font-size:13.5px;color:#262626;">Ничего похожего нет — можно создавать</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border-radius:4px;box-shadow:0 1px 3px rgba(10,10,10,0.10);padding:30px 32px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#8C8C8C;margin-bottom:22px;">E3 · отписка по ссылке из письма · без входа</div>
+        <div style="border:1px solid #E1E1E0;border-radius:4px;padding:32px 28px;">
+          <span style="width:48px;height:48px;border-radius:999px;background:#EFEFEE;color:#0A0A0A;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-2 8-2 8h16s-2-1-2-8"></path><path d="M4 4l16 16"></path></svg></span>
+          <h3 style="font-weight:700;font-size:18px;margin:0 0 10px;">Вы отписались</h3>
+          <p style="font-size:14px;line-height:1.55;color:#5C5C5C;margin:0 0 18px;max-width:40ch;">Больше не будем писать об обновлениях обращения «Экспорт графика в Excel теряет ночные смены». Остальные письма приходят как раньше.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #0A0A0A;font-size:13.5px;font-weight:700;padding:9px 18px;border-radius:999px;cursor:pointer;">Вернуть подписку</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;color:#5C5C5C;padding:10px 12px;border-radius:999px;cursor:pointer;">Настроить все письма</span>
+          </div>
+          <div style="padding-top:16px;border-top:1px solid #E1E1E0;font-size:12.5px;line-height:1.5;color:#8C8C8C;">Отписка сработала без входа — по одноразовой ссылке из письма.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1420},&quot;grayscaleCheck&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Проверки&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.rootRef = React.createRef();
+  }
+  applyFilter() {
+    const el = this.rootRef.current;
+    if (el) el.style.filter = (this.props.grayscaleCheck ?? false) ? 'grayscale(1)' : '';
+  }
+  componentDidMount() { this.applyFilter(); }
+  componentDidUpdate() { this.applyFilter(); }
+  renderVals() {
+    return { rootRef: this.rootRef };
+  }
+}
+</script>
+</body>
+</html>
