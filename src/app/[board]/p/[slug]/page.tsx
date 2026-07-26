@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { formatCount } from '@/core/content'
+import { formatCount, plural } from '@/core/content'
 import { getViewer } from '@/core/session'
+import { PostActions } from '@/features/post/post-actions'
 import { VoteControl } from '@/features/post/vote-control'
 import { queries } from '@/queries'
 import { CommentThread } from '@/ui/post/comment-thread'
@@ -22,11 +23,22 @@ export async function generateMetadata({
   if (result.kind === 'merged') {
     return { title: result.title, robots: { index: false } }
   }
+  const isPublic = result.privacy === 'public'
   return {
     title: result.title,
     description: result.details[0],
     /* Приватные обращения не индексируются (FR-564). */
-    robots: result.privacy === 'public' ? undefined : { index: false },
+    robots: isPublic ? undefined : { index: false },
+    alternates: { canonical: `/${board}/p/${slug}` },
+    openGraph: isPublic
+      ? {
+          type: 'article',
+          title: result.title,
+          /* Счётчик и статус прямо в превью: по ссылке из чата видно,
+             сколько людей это просят и на какой оно стадии (FR-143). */
+          description: `${formatCount(result.count)} ${plural(result.count, result.type.countLabel)} · ${result.status.name} — ${result.details[0]}`,
+        }
+      : undefined,
   }
 }
 
@@ -108,12 +120,15 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
             ))}
           </div>
 
-          <div className="mt-6 flex items-center gap-3 border-t border-line pt-5">
-            <Avatar initials={post.author.initials} />
-            <div className="min-w-0">
-              <p className="text-body font-semibold text-ink">{post.author.name}</p>
-              <p className="text-small text-faint">{post.author.role}</p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
+            <div className="flex items-center gap-3">
+              <Avatar initials={post.author.initials} />
+              <div className="min-w-0">
+                <p className="text-body font-semibold text-ink">{post.author.name}</p>
+                <p className="text-small text-faint">{post.author.role}</p>
+              </div>
             </div>
+            <PostActions subscribed={post.subscribed} signedIn={viewer.signedIn} />
           </div>
 
           <section className="mt-10">

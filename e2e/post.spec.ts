@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const FLAGSHIP = '/bugs/p/eksport-grafika-v-excel-teryaet-nochnye-smeny'
+const FLAGSHIP_PATH = '/bugs/p/eksport-grafika-v-excel-teryaet-nochnye-smeny'
+const FLAGSHIP = FLAGSHIP_PATH
 
 /** «214» → 214: счётчик выводится с неразрывными пробелами-разрядами. */
 function toNumber(text: string | null): number {
@@ -94,4 +95,22 @@ test('история статусов и голосовавшие видны н�
   await expect(page.getByText('История статусов')).toBeVisible()
   await expect(page.getByText('Голосовали')).toBeVisible()
   await expect(page.getByText(/и ещё/)).toBeVisible()
+})
+
+test('подписка переключается, а копирование подтверждает результат', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.goto(FLAGSHIP)
+
+  const follow = page.getByRole('button', { name: 'Следить за обновлениями' })
+  await follow.click()
+  await expect(page.getByRole('button', { name: 'Вы следите' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Скопировать ссылку' }).click()
+  await expect(page.getByRole('button', { name: 'Скопировано' })).toBeVisible()
+
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText())
+  expect(clipboard).toContain(FLAGSHIP_PATH)
 })
