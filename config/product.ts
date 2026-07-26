@@ -1,0 +1,99 @@
+/**
+ * Конфигурация продукта. ФОРК ПРАВИТ ЭТОТ ФАЙЛ.
+ *
+ * Все различия между продуктами — данные, а не код (03-architecture.md, правило 4).
+ * Ветвлений вида `if (product === 'foo')` в шаблоне быть не должно.
+ *
+ * Фичефлаги вместо удаления (правило 5): продукту не нужен changelog —
+ * `features.changelog = false`, а не «вырезали страницу в форке».
+ */
+
+export type BoardVisibility = 'public' | 'private' | 'readonly'
+
+export interface BoardConfig {
+  /** Стабильный ключ и часть URL. Не меняется после первого деплоя. */
+  slug: string
+  name: string
+  description: string
+  visibility: BoardVisibility
+  /** Порядок в навигации. */
+  position: number
+  /** Видна по прямой ссылке, но не в навигации (FR-104). */
+  hiddenFromNav?: boolean
+  /** Категория обязательна при создании обращения (FR-121). */
+  requireCategory?: boolean
+}
+
+export interface ProductConfig {
+  /** Название продукта. Выводится в шапке и в темах писем. */
+  name: string
+  /** Короткая буква/аббревиатура для знака в шапке. */
+  mark: string
+  /** Домен портала без протокола — для canonical, OpenGraph и sitemap. */
+  domain: string
+  /** Язык по умолчанию. Влияет и на словарь конфигурации Postgres для поиска. */
+  locale: 'ru' | 'en'
+  boards: BoardConfig[]
+  features: {
+    roadmap: boolean
+    changelog: boolean
+    /** Публичный список голосующих на обращении (FR-133). */
+    voterList: boolean
+    /** Приём багов отдельным типом обращения. */
+    bugIntake: boolean
+  }
+  limits: {
+    /** Не более N обращений в сутки с аккаунта (FR-126). */
+    postsPerDay: number
+    /** Не более M в час. */
+    postsPerHour: number
+    /** Размер страницы ленты. */
+    feedPageSize: number
+  }
+  /** Период полураспада голоса в днях для trending (02-data-model.md). */
+  trendingHalfLifeDays: number
+}
+
+export const product: ProductConfig = {
+  name: 'Ритмика',
+  mark: 'Р',
+  domain: 'ritmika.app',
+  locale: 'ru',
+  boards: [
+    {
+      slug: 'product',
+      name: 'Продукт',
+      description:
+        'Запросы функций и предложения по основному приложению: смены, шаблоны, права.',
+      visibility: 'public',
+      position: 1,
+    },
+    {
+      slug: 'bugs',
+      name: 'Ошибки',
+      description:
+        'Сообщения о том, что работает не так. Диагностика и вложения видны только команде.',
+      visibility: 'public',
+      position: 2,
+    },
+    {
+      slug: 'reports',
+      name: 'Отчёты и экспорт',
+      description: 'Выгрузки, сводки по часам, интеграции с бухгалтерией.',
+      visibility: 'public',
+      position: 3,
+    },
+  ],
+  features: {
+    roadmap: true,
+    changelog: true,
+    voterList: true,
+    bugIntake: true,
+  },
+  limits: {
+    postsPerDay: 5,
+    postsPerHour: 2,
+    feedPageSize: 20,
+  },
+  trendingHalfLifeDays: 21,
+}

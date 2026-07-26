@@ -1,0 +1,188 @@
+/*
+ * Токены темы. ФОРК ПРАВИТ ЭТОТ ФАЙЛ.
+ *
+ * Три группы прав, см. 07-ui-brief.md, раздел 2:
+ *   A. Бренд      — форк переопределяет свободно
+ *   B. Семантика  — форк меняет оттенок, но не значение и не контраст
+ *   C. Зафиксировано — форк не трогает
+ *
+ * Значения перенесены из design system/Дизайн-система - Product.dc.html
+ * и design system/Публичный портал - Product.dc.html.
+ *
+ * Правило, нарушение которого ломает шаблон: акцент бренда никогда не передаёт
+ * состояние. Цвет статуса берётся только из группы B по ключу status.key.
+ */
+
+@theme {
+  /* ─────────────────────────────────────────────────────────────
+     A. БРЕНД
+     ───────────────────────────────────────────────────────────── */
+
+  /* Палитра интерфейса монохромна: «цвета в системе нет», иерархия строится
+     ступенями серого, чёрный несёт все действия. Цвет — только у семантики. */
+  --color-ink: #0a0a0a; /* текст, тёмные полотна, основные кнопки */
+  --color-ink-hover: #2e2e2e; /* ховер и нажатие */
+  --color-ink-2: #262626; /* основной текст */
+  --color-muted: #5c5c5c; /* вторичный текст */
+  --color-faint: #8c8c8c; /* подписи, мета */
+  --color-line: #e1e1e0; /* рамки, разделители */
+  --color-track: #efefee; /* полосы, фон блоков, чипы */
+  --color-paper: #f3f3f2; /* фон страницы */
+  --color-tint: #ececea; /* подложка акцента */
+  --color-surface: #ffffff; /* карточки, поля */
+
+  /* Тёмная поверхность */
+  --color-dark: #0a0a0a;
+  --color-dark-raised: #1c1c1c;
+  --color-dark-line: rgb(255 255 255 / 0.12);
+  --color-dark-muted: #9a9a9a;
+
+  /* Типографика: Geologica — заголовки и текст, IBM Plex Mono — метки и числа.
+     Контраст 300/800 внутри одного заголовка — главный приём, унаследованный
+     от бренда: лёгкая формулировка и жирный смысловой хвост. */
+  --font-sans: var(--font-geologica), 'Segoe UI', system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'SF Mono', monospace;
+
+  --text-display: 3.5rem; /* 56 */
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.03em;
+  --text-h1: 2.5rem; /* 40 */
+  --text-h1--line-height: 1.06;
+  --text-h1--letter-spacing: -0.025em;
+  --text-h2: 1.75rem; /* 28 */
+  --text-h2--line-height: 1.14;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h3: 1.1875rem; /* 19 */
+  --text-h3--line-height: 1.24;
+  --text-h3--letter-spacing: -0.01em;
+  --text-body-l: 1.03125rem; /* 16.5 */
+  --text-body-l--line-height: 1.6;
+  --text-body: 0.90625rem; /* 14.5 */
+  --text-body--line-height: 1.6;
+  --text-small: 0.78125rem; /* 12.5 */
+  --text-small--line-height: 1.5;
+  --text-label: 0.6875rem; /* 11, mono caps */
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.12em;
+
+  /* Сетка: 12 колонок, gap 24, контейнер 1180, поля 40 / 32 / 20.
+     Шаг отступов — 4, совпадает с базовой шкалой Tailwind. */
+  --container-page: 1180px;
+
+  /* Радиусы: 4 карточки · 8 поля и меню · 999 кнопки и чипы */
+  --radius-card: 4px;
+  --radius-field: 8px;
+  --radius-pill: 999px;
+
+  /* Тень одна, плюс вариант для поднятых слоёв */
+  --shadow-flat: 0 1px 3px rgb(10 10 10 / 0.1);
+  --shadow-raised: 0 12px 32px rgb(10 10 10 / 0.18);
+
+  /* ─────────────────────────────────────────────────────────────
+     B. СЕМАНТИКА — оттенок форк менять может, значение и контраст нет
+     ───────────────────────────────────────────────────────────── */
+
+  /* Статусы. Имя токена = status.key из БД (02-data-model.md).
+     Новый статус в конфиге обязан получить пару токенов: палитра не может
+     кончиться. Пара всегда фон + текст, контраст текста к фону ≥ 4.5:1. */
+  --color-status-open-bg: #eef1f6;
+  --color-status-open-fg: #3c5878;
+  --color-status-needs-info-bg: #fbf1df;
+  --color-status-needs-info-fg: #8a5d12;
+  --color-status-planned-bg: #ededfa;
+  --color-status-planned-fg: #43439b;
+  --color-status-building-bg: #e4f1ef;
+  --color-status-building-fg: #155f55;
+  --color-status-beta-bg: #eef1f6;
+  --color-status-beta-fg: #3c5878;
+  --color-status-completed-bg: #e5f0e7;
+  --color-status-completed-fg: #1f6b36;
+  --color-status-wont-fix-bg: #efefee;
+  --color-status-wont-fix-fg: #5c5c5c;
+  --color-status-duplicate-bg: #f2ecf7;
+  --color-status-duplicate-fg: #5f4483;
+  --color-status-not-reproducible-bg: #f7ecec;
+  --color-status-not-reproducible-fg: #8a3f3f;
+  --color-status-closed-bg: #efefee;
+  --color-status-closed-fg: #5c5c5c;
+
+  /* Severity — оценка репортера. Три уровня, различимы в ч/б за счёт того,
+     что светлота фонов заметно разная, а компонент добавляет форму и подпись. */
+  --color-sev-blocker-bg: #f7ecec;
+  --color-sev-blocker-fg: #8a3f3f;
+  --color-sev-major-bg: #fbf1df;
+  --color-sev-major-fg: #8a5d12;
+  --color-sev-minor-bg: #efefee;
+  --color-sev-minor-fg: #5c5c5c;
+
+  /* Контуры продукта — разметка разделов админки */
+  --color-contour-intake: #3c5878;
+  --color-contour-triage: #8a5d12;
+  --color-contour-backlog: #43439b;
+
+  /* Сигналы состояния. Внутренние комментарии обязаны читаться
+     как «не для публики» с первого взгляда. */
+  --color-signal-overdue: #8a3f3f;
+  --color-signal-regression: #8a3f3f;
+  --color-signal-private: #5c5c5c;
+  --color-signal-internal-bg: #fbf1df;
+  --color-signal-internal-fg: #8a5d12;
+
+  /* ─────────────────────────────────────────────────────────────
+     C. ЗАФИКСИРОВАНО — форк не трогает
+     ───────────────────────────────────────────────────────────── */
+
+  /* Три шкалы плотности (07-ui-brief.md, раздел 6). Разница — в межстрочном,
+     высоте строки и размерах контролов, не в семье шрифта. */
+  --density-public-row: 2.75rem;
+  --density-public-control: 2.75rem; /* 44 — минимальная зона нажатия */
+  --density-admin-row: 2.25rem;
+  --density-admin-control: 2rem;
+  --density-admin-dense-row: 1.75rem;
+  --density-admin-dense-control: 1.75rem;
+}
+
+@layer base {
+  :root {
+    /* Минимальная зона нажатия. Группа C: форк не переопределяет. */
+    --tap-min: 44px;
+    /* Стиль фокуса единый на весь продукт. */
+    --focus-ring: 2px solid var(--color-ink);
+    --focus-offset: 2px;
+  }
+
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+
+  /* Фокус виден всегда (07-ui-brief.md, раздел 8). */
+  :focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* Все счётчики и таймеры — табличные цифры, иначе колонки дрожат
+     при обновлении (07-ui-brief.md, раздел 6). */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

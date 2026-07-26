@@ -1,0 +1,27 @@
+# зависимости
+node_modules/
+.pnpm-store/
+
+# сборка
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# окружение
+.env
+.env.local
+.env*.local
+
+# ос и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# логи
+*.log
+npm-debug.log*
+pnpm-debug.log*
