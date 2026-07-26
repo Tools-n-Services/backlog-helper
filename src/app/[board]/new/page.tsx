@@ -3,8 +3,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { enabledPostTypes, postTypeByKey } from '@config/post-types'
+import { getViewer } from '@/core/session'
 import { PostForm } from '@/features/intake/post-form'
 import { queries } from '@/queries'
+import {
+  PrimaryAction,
+  SecondaryAction,
+  StateScreen,
+} from '@/ui/layout/state-screen'
 
 export const metadata: Metadata = { title: 'Новое обращение' }
 
@@ -24,6 +30,50 @@ export default async function NewPostPage({
 
   const board = await queries.getBoard(boardSlug)
   if (!board || board.visibility !== 'public') notFound()
+
+  const viewer = await getViewer()
+
+  /* Блокировка объясняется причиной и путём обжалования: «недостаточно прав»
+     без объяснения — самый быстрый способ получить жалобу вместо диалога. */
+  if (viewer.banned) {
+    return (
+      <StateScreen
+        title="Аккаунт заблокирован"
+        actions={
+          <>
+            <PrimaryAction href="/">Оспорить блокировку</PrimaryAction>
+            <SecondaryAction href={`/${board.slug}`}>Читать обращения</SecondaryAction>
+          </>
+        }
+        note="Блокировка снимается вручную. Разберёмся за один рабочий день."
+      >
+        <p>Причина: {viewer.bannedReason}.</p>
+        <p>
+          Читать портал можно. Создавать обращения, голосовать и комментировать —
+          нет.
+        </p>
+      </StateScreen>
+    )
+  }
+
+  if (!viewer.signedIn) {
+    return (
+      <StateScreen
+        title="Создавать обращения можно после входа"
+        actions={
+          <>
+            <PrimaryAction href="/login">Войти</PrimaryAction>
+            <SecondaryAction href={`/${board.slug}`}>Читать обращения</SecondaryAction>
+          </>
+        }
+      >
+        <p>
+          Вход по ссылке из письма, пароль не нужен. Читать портал и искать
+          похожие обращения можно и без него.
+        </p>
+      </StateScreen>
+    )
+  }
 
   const typeKey = Array.isArray(typeParam) ? typeParam[0] : typeParam
   const type = typeKey ? postTypeByKey.get(typeKey) : undefined

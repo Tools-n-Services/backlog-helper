@@ -295,6 +295,16 @@ export interface ChangelogResult {
   labelFacets: FacetView[]
 }
 
+/* ─────────────────────────── Профиль ─────────────────────────── */
+
+export interface ProfileView {
+  /** Обращения, созданные пользователем. */
+  authored: PostCardView[]
+  /** За что он голосовал (FR-174). */
+  voted: PostCardView[]
+  stats: { authored: number; voted: number; inProgress: number }
+}
+
 /** Контракт. Обе реализации обязаны экспортировать ровно это. */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
@@ -305,4 +315,5 @@ export interface QueryPort {
   getRoadmap(boardSlug?: string, expandStatusKey?: string): Promise<RoadmapView>
   getChangelog(query: ChangelogQuery): Promise<ChangelogResult>
   getChangelogEntry(slug: string): Promise<ChangelogEntryView | null>
+  getProfile(userId: string): Promise<ProfileView>
 }

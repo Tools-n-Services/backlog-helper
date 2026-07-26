@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { formatCount, plural } from '@/core/content'
-import { getViewer } from '@/core/session'
+import { canContribute, getViewer } from '@/core/session'
 import { PostActions } from '@/features/post/post-actions'
 import { VoteControl } from '@/features/post/vote-control'
 import { queries } from '@/queries'
@@ -53,7 +53,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
   if (result.kind === 'merged') return <MergedNotice result={result} />
 
   const post = result
-  const viewer = getViewer()
+  const viewer = await getViewer()
 
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-8 md:px-8 lg:px-10">
@@ -79,7 +79,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
               count={post.count}
               type={post.type}
               voted={post.voted}
-              signedIn={viewer.signedIn}
+              signedIn={canContribute(viewer)}
               variant="page"
             />
 
@@ -128,7 +128,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                 <p className="text-small text-faint">{post.author.role}</p>
               </div>
             </div>
-            <PostActions subscribed={post.subscribed} signedIn={viewer.signedIn} />
+            <PostActions subscribed={post.subscribed} signedIn={canContribute(viewer)} />
           </div>
 
           <section className="mt-10">

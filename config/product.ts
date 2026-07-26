@@ -83,6 +83,14 @@ export const product: ProductConfig = {
       visibility: 'public',
       position: 3,
     },
+    {
+      slug: 'enterprise',
+      name: 'Корпоративные клиенты',
+      description:
+        'Доска для компаний на платном тарифе: интеграции, SLA, требования безопасности.',
+      visibility: 'private',
+      position: 4,
+    },
   ],
   features: {
     roadmap: true,

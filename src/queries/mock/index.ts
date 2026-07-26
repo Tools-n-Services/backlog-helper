@@ -29,6 +29,7 @@ import type {
   PostCardView,
   PostPageResult,
   PostTypeView,
+  ProfileView,
   ChangelogEntryView,
   ChangelogQuery,
   ChangelogResult,
@@ -682,6 +683,28 @@ export const mockQueries: QueryPort = {
   async getChangelogEntry(slug: string): Promise<ChangelogEntryView | null> {
     const seed = changelogSeeds.find((e) => e.slug === slug)
     return seed ? toEntryView(seed, new Date()) : null
+  },
+
+  async getProfile(): Promise<ProfileView> {
+    const now = new Date()
+    const visible = posts.filter(isPubliclyListed)
+
+    /* Принадлежность обращений пользователю в фикстурах синтетическая:
+       настоящая связь появится в B1 вместе с author_id и таблицей vote. */
+    const authored = visible.filter((_, i) => i % 9 === 2).map((p) => toCardView(p, now))
+    const voted = visible.filter((_, i) => i % 4 === 1).map((p) => toCardView(p, now))
+
+    return {
+      authored,
+      voted,
+      stats: {
+        authored: authored.length,
+        voted: voted.length,
+        inProgress: [...authored, ...voted].filter(
+          (p) => p.status.key === 'building' || p.status.key === 'planned',
+        ).length,
+      },
+    }
   },
 }
 

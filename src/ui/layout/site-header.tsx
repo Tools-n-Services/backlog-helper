@@ -2,12 +2,15 @@ import Link from 'next/link'
 
 import { product } from '@config/product'
 import { t } from '@/core/content'
+import { getViewer } from '@/core/session'
+import { Avatar } from '@/ui/primitives/avatar'
 
 /**
  * Шапка публичного портала. Плотность — шкала `public`.
  * Вёрстка перенесена из design system/Публичный портал - Product.dc.html.
  */
-export function SiteHeader() {
+export async function SiteHeader() {
+  const viewer = await getViewer()
   const boards = product.boards
     .filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
     .sort((a, b) => a.position - b.position)
@@ -60,12 +63,22 @@ export function SiteHeader() {
               {t.nav.changelog}
             </Link>
           )}
-          <Link
-            href="/login"
-            className="rounded-pill bg-ink px-4 py-2 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
-          >
-            {t.nav.signIn}
-          </Link>
+          {viewer.signedIn ? (
+            <Link
+              href="/profile"
+              aria-label={`${t.nav.profile}: ${viewer.name}`}
+              className="rounded-pill p-0.5 transition-colors hover:bg-track"
+            >
+              <Avatar initials={viewer.initials} isTeam={viewer.isTeam} />
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-pill bg-ink px-4 py-2 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
+            >
+              {t.nav.signIn}
+            </Link>
+          )}
         </div>
       </div>
     </header>
