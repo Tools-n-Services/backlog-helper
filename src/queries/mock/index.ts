@@ -10,7 +10,10 @@
 import { product } from '@config/product'
 import { statuses, statusByKey } from '@config/statuses'
 import { postTypes, postTypeByKey } from '@config/post-types'
+import { severities } from '@config/scoring'
 import type { Privacy } from '@config/post-types'
+import { autoPriority } from '@/core/domain/triage/priority'
+import { slaDueAt, slaState } from '@/core/domain/triage/sla'
 import {
   isSearchable,
   SIMILARITY_THRESHOLD,
@@ -39,6 +42,9 @@ import type {
   RoadmapView,
   SimilarPostView,
   SimilarQuery,
+  TriageQuery,
+  TriageQueueView,
+  TriageRowView,
   StatusChangeView,
   StatusView,
 } from '@/queries/types'
@@ -53,7 +59,9 @@ import {
   mergedInto,
   people,
   postDetails,
+  intakeSourceNames,
   postSeeds,
+  triageByTitle,
   type ChangelogSeed,
   type CommentSeed,
   type PostSeed,
@@ -442,6 +450,76 @@ const CHANGE_KIND_NAMES: Record<ChangeKind, string> = {
   fixed: 'Исправлено',
 }
 
+
+/* ──────────────────────────── Триаж ──────────────────────────── */
+
+const DEFAULT_TRIAGE = {
+  severity: 'minor',
+  frequency: 'sometimes',
+  source: 'portal',
+  segment: 'free',
+} as const
+
+function ageLabelOf(days: number): string {
+  if (days < 1) return 'сегодня'
+  if (days < 30) return `${Math.round(days)} д`
+  return `${Math.round(days / 30)} мес`
+}
+
+function toTriageRow(post: MockPost, index: number, now: Date): TriageRowView {
+  const seed = post.seed
+  const triage = triageByTitle[seed.title]
+  const severity = triage?.severity ?? (seed.typeKey === 'bug' ? DEFAULT_TRIAGE.severity : null)
+  const frequency = triage?.frequency ?? DEFAULT_TRIAGE.frequency
+  const source = triage?.source ?? DEFAULT_TRIAGE.source
+  const segment = triage?.segment ?? DEFAULT_TRIAGE.segment
+
+  const createdAt = new Date(now.getTime() - post.createdAgoDays * MS_PER_DAY)
+  const due = slaDueAt(createdAt, seed.typeKey, severity)
+  /* Первый ответ состоялся, если команда отписалась в треде. Флаг из данных
+     триажа уточняет это для багов, но `teamReply` значит ровно то же самое
+     и для идей — иначе годовалая идея с ответом команды считается просроченной
+     и очередь показывает катастрофу там, где её нет. */
+  const answered = triage?.answered ?? seed.teamReply ?? false
+  const firstResponseAt = answered
+    ? new Date(now.getTime() - post.updatedAgoDays * MS_PER_DAY)
+    : null
+
+  const assignee = triage?.assignee !== undefined ? toPerson(triage.assignee) : null
+
+  return {
+    id: post.id,
+    slug: post.slug,
+    boardSlug: seed.boardSlug,
+    ref: refFor(index),
+    title: seed.title,
+    typeName: postTypeByKey.get(seed.typeKey)?.name ?? seed.typeKey,
+    typeKey: seed.typeKey,
+    status: toStatusView(seed.statusKey),
+    severityKey: severity,
+    severityShort: severities.find((s) => s.key === severity)?.short ?? null,
+    priorityKey: triage?.priority ?? null,
+    sourceKey: source,
+    sourceName: intakeSourceNames[source],
+    affectedCount: seed.votes,
+    ageLabel: ageLabelOf(post.createdAgoDays),
+    ageDays: post.createdAgoDays,
+    sla: (() => {
+      const view = slaState(due, now, firstResponseAt)
+      return { state: view.state, label: view.label }
+    })(),
+    assigneeName: assignee?.name ?? null,
+    assigneeInitials: assignee?.initials ?? null,
+    regression: triage?.regression ?? false,
+    autoPriority: autoPriority({
+      severity,
+      frequency,
+      affectedCount: seed.votes,
+      segment,
+    }),
+  }
+}
+
 export const mockQueries: QueryPort = {
   async listBoards(): Promise<BoardView[]> {
     return product.boards
@@ -706,6 +784,87 @@ export const mockQueries: QueryPort = {
       },
     }
   },
+
+  async getTriageQueue(query: TriageQuery): Promise<TriageQueueView> {
+    const now = new Date()
+
+    /* В очередь попадает всё незакрытое, включая вопросы: они тоже требуют
+       ответа, просто не идут в бэклог (FR-507). */
+    const all = posts
+      .map((post, index) => ({ post, row: toTriageRow(post, index, now) }))
+      .filter(({ row }) => !row.status.isTerminal)
+
+    const matched = all.filter(({ row }) => {
+      if (query.overdueOnly && row.sla.state !== 'overdue') return false
+      if (query.severityKeys.length && !query.severityKeys.includes(row.severityKey ?? ''))
+        return false
+      if (query.typeKeys.length && !query.typeKeys.includes(row.typeKey)) return false
+      if (query.search && !row.title.toLowerCase().includes(query.search.toLowerCase()))
+        return false
+      return true
+    })
+
+    const sorted = matched.slice().sort((a, b) => {
+      /* Отвеченное уходит вниз в любой сортировке: очередь — про то, что ждёт
+         действия, а не про то, что уже разобрано. */
+      const answered = (r: typeof a) => r.row.sla.state === 'answered'
+      if (answered(a) !== answered(b)) return answered(a) ? 1 : -1
+
+      /* Среди требующих действия регрессии идут первыми: повтор ранее
+         исправленного — сигнал о сбое процесса, а не рядовое обращение (FR-525). */
+      if (a.row.regression !== b.row.regression) return a.row.regression ? -1 : 1
+
+      switch (query.sort) {
+        case 'sla':
+          return a.row.sla.state === b.row.sla.state
+            ? b.row.autoPriority - a.row.autoPriority
+            : slaRank(a.row.sla.state) - slaRank(b.row.sla.state)
+        case 'new':
+          return a.row.ageDays - b.row.ageDays
+        default:
+          return b.row.autoPriority - a.row.autoPriority
+      }
+    })
+
+    const untriaged = all.filter(({ row }) => row.sla.state !== 'answered')
+
+    const countBy = (pick: (r: TriageRowView) => string | null) => {
+      const map = new Map<string, number>()
+      for (const { row } of all) {
+        const key = pick(row)
+        if (key) map.set(key, (map.get(key) ?? 0) + 1)
+      }
+      return map
+    }
+
+    const severityCounts = countBy((r) => r.severityKey)
+    const typeCounts = countBy((r) => r.typeKey)
+
+    return {
+      rows: sorted.map(({ row }) => row),
+      total: sorted.length,
+      metrics: {
+        untriaged: untriaged.length,
+        overdue: all.filter(({ row }) => row.sla.state === 'overdue').length,
+        oldestUntriagedDays: Math.round(
+          Math.max(0, ...untriaged.map(({ row }) => row.ageDays)),
+        ),
+        awaitingReporter: all.filter(({ post }) => post.seed.awaitingReporter).length,
+      },
+      facets: {
+        severities: severities
+          .map((s) => ({ key: s.key, name: s.name, count: severityCounts.get(s.key) ?? 0 }))
+          .filter((f) => f.count > 0),
+        types: postTypes
+          .map((t) => ({ key: t.key, name: t.name, count: typeCounts.get(t.key) ?? 0 }))
+          .filter((f) => f.count > 0),
+      },
+    }
+  },
+}
+
+function slaRank(state: TriageRowView['sla']['state']): number {
+  return { overdue: 0, soon: 1, ok: 2, none: 3, answered: 4 }[state]
 }
 
 /**

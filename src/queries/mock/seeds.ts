@@ -1088,3 +1088,111 @@ export const changelogSeeds: ChangelogSeed[] = [
     closes: ['Выгрузка сразу по нескольким филиалам одним файлом'],
   },
 ]
+
+// ── Триаж ───────────────────────────────────────────────────────────────
+
+export type IntakeSourceKey = 'portal' | 'widget' | 'email' | 'api' | 'admin'
+
+export const intakeSourceNames: Record<IntakeSourceKey, string> = {
+  portal: 'портал',
+  widget: 'виджет',
+  email: 'почта',
+  api: 'API',
+  admin: 'вручную',
+}
+
+export interface TriageSeed {
+  severity: 'blocker' | 'major' | 'minor'
+  frequency: 'always' | 'sometimes' | 'once'
+  source: IntakeSourceKey
+  /** Сегмент репортера — вход в автооценку приоритета. */
+  segment: 'enterprise' | 'paid' | 'free'
+  /** Индекс в `people`; null — не назначено. */
+  assignee?: number
+  /** Команда уже ответила: SLA остановлен. */
+  answered?: boolean
+  /** Приоритет команды, если уже проставлен. */
+  priority?: 'p0' | 'p1' | 'p2' | 'p3'
+  /** Повтор ранее исправленного бага (FR-525). */
+  regression?: boolean
+}
+
+/**
+ * Данные триажа по обращениям. В фазе B это колонки `post` — severity,
+ * frequency, source_id, assignee_id, first_response_at.
+ */
+export const triageByTitle: Record<string, TriageSeed> = {
+  'Экспорт графика в Excel теряет ночные смены': {
+    severity: 'major', frequency: 'always', source: 'portal', segment: 'enterprise',
+    assignee: 9, answered: true, priority: 'p1',
+  },
+  'Менеджер филиала видит смены соседнего филиала': {
+    severity: 'blocker', frequency: 'sometimes', source: 'email', segment: 'enterprise',
+    assignee: 10, answered: true, priority: 'p0',
+  },
+  'Смена, удалённая с телефона, возвращается после синхронизации': {
+    severity: 'major', frequency: 'always', source: 'widget', segment: 'paid',
+  },
+  'Перевод часов ломает длительность смены на сутки вперёд': {
+    severity: 'major', frequency: 'sometimes', source: 'portal', segment: 'paid',
+    assignee: 9, answered: true, priority: 'p2', regression: true,
+  },
+  'Приложение выкидывает из аккаунта при смене сети': {
+    severity: 'blocker', frequency: 'always', source: 'widget', segment: 'paid',
+  },
+  'В выгрузке пропадают сотрудники без смен в периоде': {
+    severity: 'major', frequency: 'always', source: 'email', segment: 'enterprise',
+    assignee: 9, answered: true, priority: 'p1',
+  },
+  'Смена иногда не сохраняется без сообщения об ошибке': {
+    severity: 'blocker', frequency: 'once', source: 'portal', segment: 'free',
+    assignee: 10, answered: true,
+  },
+  'Двойные смены после одновременного редактирования': {
+    severity: 'blocker', frequency: 'sometimes', source: 'widget', segment: 'enterprise',
+  },
+  'Уволенный сотрудник продолжает получать уведомления о сменах': {
+    severity: 'major', frequency: 'always', source: 'email', segment: 'paid',
+  },
+  'На маленьких экранах не видно кнопку подтверждения смены': {
+    severity: 'major', frequency: 'always', source: 'widget', segment: 'free',
+    assignee: 9, answered: true, priority: 'p2',
+  },
+  'Ночная смена отображается в неправильном дне недели': {
+    severity: 'minor', frequency: 'always', source: 'portal', segment: 'free',
+  },
+  'Кириллица в именах файлов превращается в вопросительные знаки': {
+    severity: 'minor', frequency: 'always', source: 'portal', segment: 'free',
+  },
+  'График не обновляется в фоновом режиме на старых Android': {
+    severity: 'minor', frequency: 'sometimes', source: 'widget', segment: 'free',
+    assignee: 9, answered: true, priority: 'p3',
+  },
+  'Копирование недели дублирует отпуска': {
+    severity: 'major', frequency: 'always', source: 'portal', segment: 'enterprise',
+  },
+  'Push о смене приходит с задержкой в несколько часов': {
+    severity: 'major', frequency: 'sometimes', source: 'widget', segment: 'paid',
+    assignee: 10, answered: true,
+  },
+  'Права не применяются до перезахода в аккаунт': {
+    severity: 'blocker', frequency: 'always', source: 'api', segment: 'enterprise',
+    assignee: 9, answered: true, priority: 'p0',
+  },
+  'Выгрузка за большой период обрывается на середине': {
+    severity: 'major', frequency: 'always', source: 'portal', segment: 'paid',
+  },
+  'Изменения пропадают при быстром переключении между филиалами': {
+    severity: 'major', frequency: 'once', source: 'portal', segment: 'free',
+    assignee: 10, answered: true,
+  },
+  'Итог по часам в файле не сходится с итогом на экране': {
+    severity: 'blocker', frequency: 'always', source: 'email', segment: 'enterprise',
+  },
+  'При печати обрезается последний столбец недели': {
+    severity: 'minor', frequency: 'always', source: 'portal', segment: 'free',
+  },
+  'Как передать права управляющего на время отпуска': {
+    severity: 'minor', frequency: 'once', source: 'email', segment: 'paid',
+  },
+}

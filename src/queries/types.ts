@@ -305,6 +305,73 @@ export interface ProfileView {
   stats: { authored: number; voted: number; inProgress: number }
 }
 
+/* ──────────────────────────── Триаж ──────────────────────────── */
+
+export type SlaState = 'answered' | 'ok' | 'soon' | 'overdue' | 'none'
+
+/**
+ * Строка очереди триажа (FR-531).
+ *
+ * Плоская и уже посчитанная: очередь читают по диагонали, и любое вычисление
+ * в компоненте — это дрожание колонок при обновлении.
+ */
+export interface TriageRowView {
+  id: string
+  slug: string
+  boardSlug: string
+  ref: string
+  title: string
+  typeName: string
+  typeKey: string
+  status: StatusView
+  /** Оценка репортера: «насколько мешает». Не приоритет команды. */
+  severityKey: string | null
+  severityShort: string | null
+  /** Приоритет команды (FR-536). null — ещё не проставлен. */
+  priorityKey: string | null
+  /** Канал приёма: если 90% из одного, остальные не работают (FR-557). */
+  sourceKey: string
+  sourceName: string
+  /** Уникальные затронутые — основной сигнал у багов (FR-524). */
+  affectedCount: number
+  /** Возраст обращения, готовая подпись. */
+  ageLabel: string
+  ageDays: number
+  sla: { state: SlaState; label: string }
+  assigneeName: string | null
+  assigneeInitials: string | null
+  /** Повтор ранее исправленного бага — поднимается в очереди (FR-525). */
+  regression: boolean
+  /** Автооценка приоритета: подсказка для сортировки, не решение. */
+  autoPriority: number
+}
+
+export type TriageSort = 'auto' | 'sla' | 'new'
+
+export interface TriageQuery {
+  sort: TriageSort
+  /** Только просроченные по SLA. */
+  overdueOnly: boolean
+  severityKeys: string[]
+  typeKeys: string[]
+  /** Только назначенные на этого пользователя (FR-537). */
+  assigneeId?: string | undefined
+  search: string
+}
+
+export interface TriageQueueView {
+  rows: TriageRowView[]
+  total: number
+  /** Метрики очереди: без них процесс незаметно деградирует (05-bug-intake §3.2). */
+  metrics: {
+    untriaged: number
+    overdue: number
+    oldestUntriagedDays: number
+    awaitingReporter: number
+  }
+  facets: { severities: FacetView[]; types: FacetView[] }
+}
+
 /** Контракт. Обе реализации обязаны экспортировать ровно это. */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
@@ -316,4 +383,5 @@ export interface QueryPort {
   getChangelog(query: ChangelogQuery): Promise<ChangelogResult>
   getChangelogEntry(slug: string): Promise<ChangelogEntryView | null>
   getProfile(userId: string): Promise<ProfileView>
+  getTriageQueue(query: TriageQuery): Promise<TriageQueueView>
 }
