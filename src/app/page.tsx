@@ -1,16 +1,17 @@
 import Link from 'next/link'
 
-import { product } from '@config/product'
+import { formatCount, plural } from '@/core/content'
 import { t } from '@/core/content'
+import { queries } from '@/queries'
 
 /**
- * Главная: список досок. Счётчики обращений появятся в итерации A1,
- * когда заработает слой queries.
+ * Главная: список досок со счётчиками. Доски с разбросом от десятка до
+ * пятнадцати тысяч обращений должны выглядеть одинаково прилично.
  */
-export default function HomePage() {
-  const boards = product.boards
-    .filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
-    .sort((a, b) => a.position - b.position)
+export default async function HomePage() {
+  const boards = (await queries.listBoards()).filter(
+    (b) => b.visibility !== 'private',
+  )
 
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-14 md:px-8 lg:px-10">
@@ -31,11 +32,19 @@ export default function HomePage() {
           <li key={board.slug}>
             <Link
               href={`/${board.slug}`}
-              className="group flex h-full flex-col rounded-card border border-line bg-surface p-5 transition-shadow hover:shadow-flat"
+              className="flex h-full flex-col rounded-card border border-line bg-surface p-5 transition-shadow hover:shadow-flat"
             >
-              <span className="text-h3 font-bold text-ink">{board.name}</span>
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="text-h3 font-bold text-ink">{board.name}</span>
+                <span className="tnum shrink-0 text-small text-faint">
+                  {formatCount(board.postCount)}
+                </span>
+              </span>
               <span className="mt-2 text-small text-muted">
                 {board.description}
+              </span>
+              <span className="mt-4 font-mono text-label uppercase text-faint">
+                {plural(board.postCount, ['обращение', 'обращения', 'обращений'])}
               </span>
             </Link>
           </li>

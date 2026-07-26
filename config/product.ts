@@ -93,7 +93,7 @@ export const product: ProductConfig = {
   limits: {
     postsPerDay: 5,
     postsPerHour: 2,
-    feedPageSize: 20,
+    feedPageSize: 12,
   },
   trendingHalfLifeDays: 21,
 }
