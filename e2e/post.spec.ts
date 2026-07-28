@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test'
 
+import { stateFor } from './global-setup'
+
+/* Все сценарии файла — от имени вошедшего участника: голосовать
+   и создавать обращения гость не может, и это проверяется отдельно
+   в states.spec.ts. */
+test.use({ storageState: stateFor('user') })
+
 const FLAGSHIP_PATH = '/bugs/p/eksport-grafika-v-excel-teryaet-nochnye-smeny'
 const FLAGSHIP = FLAGSHIP_PATH
 
@@ -8,25 +15,39 @@ function toNumber(text: string | null): number {
   return Number((text ?? '').replace(/\D/g, ''))
 }
 
-test('голос ставится и снимается, счётчик возвращается к исходному', async ({
-  page,
-}) => {
+/**
+ * Обратно в тот вид, в котором число стоит на кнопке. Нужно, чтобы ждать
+ * значения через `toHaveText`, а не читать текст один раз: счётчик
+ * обновляется дважды — предположительно и по ответу сервера.
+ */
+function formatted(value: number): string {
+  return new Intl.NumberFormat('ru-RU').format(value)
+}
+
+/*
+ * Голос — свойство пары (обращение, человек), и демонстрационный пользователь
+ * за многое уже голосовал. Поэтому проверки идут от текущего состояния,
+ * а не от предположения «голоса нет»: важно, что переключатель работает
+ * в обе стороны и возвращает счётчик, а не то, с чего он начал.
+ */
+test('голос переключается в обе стороны и возвращает счётчик', async ({ page }) => {
   await page.goto(FLAGSHIP)
 
   const vote = page.getByRole('button', { name: /У меня тоже/ })
   const counter = vote.locator('.tnum')
 
   const before = toNumber(await counter.textContent())
-  await expect(vote).toHaveAttribute('aria-pressed', 'false')
+  const votedAtStart = (await vote.getAttribute('aria-pressed')) === 'true'
 
   await vote.click()
-  await expect(vote).toHaveAttribute('aria-pressed', 'true')
-  expect(toNumber(await counter.textContent())).toBe(before + 1)
-  await expect(vote).toContainText('вы за')
+  await expect(vote).toHaveAttribute('aria-pressed', String(!votedAtStart))
+  await expect(counter).toHaveText(
+    formatted(votedAtStart ? before - 1 : before + 1),
+  )
 
   await vote.click()
-  await expect(vote).toHaveAttribute('aria-pressed', 'false')
-  expect(toNumber(await counter.textContent())).toBe(before)
+  await expect(vote).toHaveAttribute('aria-pressed', String(votedAtStart))
+  await expect(counter).toHaveText(formatted(before))
 })
 
 test('повторные нажатия не накручивают счётчик', async ({ page }) => {
@@ -35,21 +56,27 @@ test('повторные нажатия не накручивают счётчи
   const vote = page.getByRole('button', { name: /У меня тоже/ })
   const counter = vote.locator('.tnum')
   const before = toNumber(await counter.textContent())
+  const votedAtStart = await vote.getAttribute('aria-pressed')
 
   for (let i = 0; i < 6; i++) await vote.click()
 
   /* Чётное число нажатий обязано вернуть исходное значение. */
-  expect(toNumber(await counter.textContent())).toBe(before)
-  await expect(vote).toHaveAttribute('aria-pressed', 'false')
+  await expect(counter).toHaveText(formatted(before))
+  await expect(vote).toHaveAttribute('aria-pressed', votedAtStart ?? 'false')
 })
 
 test('голосовать можно прямо из ленты, не открывая обращение', async ({ page }) => {
   await page.goto('/product')
 
   const firstVote = page.locator('article').first().getByRole('button')
+  const before = await firstVote.getAttribute('aria-pressed')
+
   await firstVote.click()
 
-  await expect(firstVote).toHaveAttribute('aria-pressed', 'true')
+  await expect(firstVote).toHaveAttribute(
+    'aria-pressed',
+    String(before !== 'true'),
+  )
   expect(new URL(page.url()).pathname).toBe('/product')
 })
 
@@ -104,9 +131,19 @@ test('подписка переключается, а копирование п�
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto(FLAGSHIP)
 
-  const follow = page.getByRole('button', { name: 'Следить за обновлениями' })
-  await follow.click()
-  await expect(page.getByRole('button', { name: 'Вы следите' })).toBeVisible()
+  /* Демонстрационный пользователь голосовал за это обращение, а голос
+     подписывает автоматически, — поэтому переключаем от текущего состояния. */
+  const following = page.getByRole('button', { name: 'Вы следите' })
+  const notFollowing = page.getByRole('button', { name: 'Следить за обновлениями' })
+
+  if (await following.isVisible()) {
+    await following.click()
+    await expect(notFollowing).toBeVisible()
+    await notFollowing.click()
+  } else {
+    await notFollowing.click()
+  }
+  await expect(following).toBeVisible()
 
   await page.getByRole('button', { name: 'Скопировать ссылку' }).click()
   await expect(page.getByRole('button', { name: 'Скопировано' })).toBeVisible()

@@ -1,5 +1,6 @@
 'use server'
 
+import { getViewer } from '@/core/session'
 import { queries } from '@/queries'
 import type { FeedPage, FeedQuery } from '@/queries/types'
 
@@ -13,7 +14,11 @@ export async function loadMoreFeed(
   query: FeedQuery,
   cursor: string,
 ): Promise<FeedPage> {
-  const result = await queries.getFeed({ ...query, cursor })
+  const viewer = await getViewer()
+  const result = await queries.getFeed(
+    { ...query, cursor },
+    viewer.signedIn ? viewer.id : undefined,
+  )
   return {
     items: result.items,
     nextCursor: result.nextCursor,

@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 
 import { formatCount, plural } from '@/core/content'
 import { StatusBadge } from '@/ui/primitives/status-badge'
+import { voteAction } from '@/features/post/actions'
 import type { SimilarPostView } from '@/queries/types'
 
 /**
@@ -57,8 +59,33 @@ export function SimilarInset({
 }
 
 function SimilarCard({ post }: { post: SimilarPostView }) {
+  const router = useRouter()
   const [voted, setVoted] = useState(post.voted)
-  const count = post.count + (voted === post.voted ? 0 : voted ? 1 : -1)
+  const [serverCount, setServerCount] = useState<number | null>(null)
+  const [, startTransition] = useTransition()
+
+  const count =
+    serverCount ?? post.count + (voted === post.voted ? 0 : voted ? 1 : -1)
+
+  /* Голос отсюда — обычный голос, а не отметка в форме: человек пришёл
+     создавать обращение, увидел своё же в списке и передумал. Именно ради
+     этого врезка и существует, поэтому она обязана дойти до базы. */
+  const vote = () => {
+    const next = !voted
+    setVoted(next)
+    setServerCount(null)
+
+    startTransition(async () => {
+      const result = await voteAction(post.id)
+      if (result.ok) {
+        setVoted(result.voted)
+        setServerCount(result.count)
+        return
+      }
+      setVoted(!next)
+      if (result.reason === 'unauthorized') router.push('/login')
+    })
+  }
 
   return (
     <article className="flex items-start gap-3 rounded-card border border-line bg-surface p-3">
@@ -91,7 +118,7 @@ function SimilarCard({ post }: { post: SimilarPostView }) {
       {post.type.allowsVotes && !post.status.isTerminal && (
         <button
           type="button"
-          onClick={() => setVoted((v) => !v)}
+          onClick={vote}
           aria-pressed={voted}
           className={
             'shrink-0 rounded-pill px-3.5 py-1.5 text-small font-semibold transition-colors ' +

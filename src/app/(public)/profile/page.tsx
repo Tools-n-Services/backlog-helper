@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { formatCount, plural } from '@/core/content'
 import { getViewer } from '@/core/session'
+import { signOutAction } from '@/features/session/actions'
 import { queries } from '@/queries'
 import { PostCard } from '@/ui/feed/post-card'
 import { Avatar } from '@/ui/primitives/avatar'
@@ -56,6 +57,17 @@ export default async function ProfilePage({ searchParams }: PageProps<'/profile'
             {viewer.email} · {viewer.memberSince}
           </p>
         </div>
+
+        {/* Выход рядом с именем, а не в глубине настроек: это то действие,
+            которое ищут глазами, а не через меню. */}
+        <form action={signOutAction} className="ml-auto">
+          <button
+            type="submit"
+            className="rounded-pill border border-line px-4 py-2 text-small font-semibold text-ink-2 transition-colors hover:bg-surface-2"
+          >
+            Выйти
+          </button>
+        </form>
       </header>
 
       <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4 border-y border-line py-5">

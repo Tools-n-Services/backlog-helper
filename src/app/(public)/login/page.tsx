@@ -11,7 +11,21 @@ export const metadata: Metadata = { title: 'Вход' }
  * Пароля нет намеренно: портал фидбэка — не то место, ради которого заводят
  * ещё один пароль, а забытый пароль стоит команде обращения в поддержку.
  */
-export default function LoginPage() {
+const ERRORS: Record<string, string> = {
+  'invalid-email': 'Проверьте адрес: похоже, в нём опечатка.',
+  'rate-limited':
+    'Мы уже отправили несколько ссылок на этот адрес. Проверьте почту, включая «Спам», — новую можно запросить через час.',
+}
+
+export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
+  const params = await searchParams
+  const first = (key: string) => {
+    const value = params[key]
+    return Array.isArray(value) ? value[0] : value
+  }
+  const error = first('error')
+  const message = error ? ERRORS[error] : null
+
   return (
     <div className="mx-auto max-w-page px-5 py-20 md:px-8 lg:px-10">
       <div className="mx-auto max-w-[38rem]">
@@ -30,6 +44,15 @@ export default function LoginPage() {
           в один клик.
         </p>
 
+        {message && (
+          <p
+            role="alert"
+            className="mt-7 rounded-field border border-line bg-surface-2 px-4 py-3 text-small text-ink-2"
+          >
+            {message}
+          </p>
+        )}
+
         <form action={requestMagicLink} className="mt-9">
           <label
             htmlFor="email"
@@ -43,6 +66,9 @@ export default function LoginPage() {
             type="email"
             required
             autoComplete="email"
+            /* Адрес возвращается в поле: заставлять набирать его заново
+               после отказа — верный способ получить вторую опечатку. */
+            defaultValue={first('email') ?? ''}
             placeholder={`имя@${product.domain}`}
             className="w-full rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2 placeholder:text-faint"
           />

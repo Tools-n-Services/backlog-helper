@@ -1,4 +1,7 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+
+import { stateFor } from './global-setup'
+import { signIn } from './sign-in'
 
 /**
  * Служебные состояния (07-ui-brief.md, раздел 5).
@@ -7,20 +10,22 @@ import { expect, test, type Page } from '@playwright/test'
  * и есть действие, которое из него выводит.
  */
 
-async function setRole(page: Page, role: string) {
-  await page.context().addCookies([
-    { name: 'viewer-role', value: role, url: 'http://localhost:3000' },
-  ])
-}
+/* Гость по умолчанию: сессии нет, пока её не открыли. Тесты, которым
+   нужен вошедший, объявляют это через test.use. */
 
 test('вход: письмо отправлено — отдельный экран, а не тост', async ({ page }) => {
+  /* Свой адрес на каждый прогон: на один адрес приходится не больше пяти
+     ссылок в час, и повторные запуски за час упирались бы в этот лимит —
+     то есть тест падал бы на правильно работающей защите. */
+  const email = `login-screen-${Date.now()}@example.com`
+
   await page.goto('/login')
-  await page.locator('#email').fill('e.sorokina@ritmika.app')
+  await page.locator('#email').fill(email)
   await page.getByRole('button', { name: 'Получить ссылку' }).click()
 
   await expect(page).toHaveURL(/\/login\/sent/)
   await expect(page.locator('h1')).toContainText('Ссылка')
-  await expect(page.getByText('e.sorokina@ritmika.app')).toBeVisible()
+  await expect(page.getByText(email)).toBeVisible()
   await expect(page.getByRole('link', { name: 'Отправить снова' })).toBeVisible()
 })
 
@@ -30,22 +35,25 @@ test('закрытая доска объясняет причину, а не о�
   expect(response?.status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Доска закрыта' })).toBeVisible()
   await expect(page.getByText(/платным тарифом/)).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Войти' })).toBeVisible()
+  /* Именно в содержимом: «Войти» есть и в шапке у любого гостя. */
+  await expect(page.locator('#main').getByRole('link', { name: 'Войти' })).toBeVisible()
 })
 
-test('заблокированный аккаунт видит причину и путь обжалования', async ({ page }) => {
-  await setRole(page, 'banned')
-  await page.goto('/product/new')
+test.describe('заблокированный аккаунт', () => {
+  test.use({ storageState: stateFor('banned') })
 
-  await expect(page.getByRole('heading', { name: 'Аккаунт заблокирован' })).toBeVisible()
-  await expect(page.getByText(/Причина:/)).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Оспорить блокировку' })).toBeVisible()
-  /* Читать при этом можно — иначе блокировка выглядит удалением аккаунта. */
-  await expect(page.getByRole('link', { name: 'Читать обращения' })).toBeVisible()
+  test('видит причину и путь обжалования', async ({ page }) => {
+    await page.goto('/product/new')
+
+    await expect(page.getByRole('heading', { name: 'Аккаунт заблокирован' })).toBeVisible()
+    await expect(page.getByText(/Причина:/)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Оспорить блокировку' })).toBeVisible()
+    /* Читать при этом можно — иначе блокировка выглядит удалением аккаунта. */
+    await expect(page.getByRole('link', { name: 'Читать обращения' })).toBeVisible()
+  })
 })
 
 test('гость видит вход вместо формы создания', async ({ page }) => {
-  await setRole(page, 'guest')
   await page.goto('/product/new')
 
   await expect(page.getByText(/после входа/)).toBeVisible()
@@ -53,7 +61,6 @@ test('гость видит вход вместо формы создания', 
 })
 
 test('гость не голосует, а попадает на вход', async ({ page }) => {
-  await setRole(page, 'guest')
   await page.goto('/product')
 
   const vote = page.locator('article').first().getByRole('link').first()
@@ -79,7 +86,6 @@ test('ошибка ленты предлагает повтор, а не «чт�
 })
 
 test('отписка работает без входа', async ({ page }) => {
-  await setRole(page, 'guest')
   await page.goto('/unsubscribe?post=' + encodeURIComponent('Экспорт графика в Excel'))
 
   await expect(page.getByRole('heading', { name: 'Вы отписались' })).toBeVisible()
@@ -87,24 +93,48 @@ test('отписка работает без входа', async ({ page }) => {
   await expect(page.getByText(/без входа/)).toBeVisible()
 })
 
-test('профиль показывает обращения, голоса и настройки писем', async ({ page }) => {
-  await setRole(page, 'user')
+test.describe('вошедший участник', () => {
+  test.use({ storageState: stateFor('user') })
+
+  test('профиль показывает обращения, голоса и настройки писем', async ({ page }) => {
+    await page.goto('/profile')
+
+    await expect(page.getByRole('heading', { name: 'Елена Сорокина' })).toBeVisible()
+    await expect(page.locator('article').first()).toBeVisible()
+
+    /* Строго внутри навигации профиля: «Уведомления» — ещё и название
+       категории, и в списке собственных обращений таких ссылок несколько. */
+    const tabs = page.getByLabel('Разделы профиля')
+
+    await tabs.getByRole('link', { name: 'За что голосовал' }).click()
+    await expect(page).toHaveURL(/tab=votes/)
+    await expect(page.locator('article').first()).toBeVisible()
+
+    await tabs.getByRole('link', { name: 'Уведомления' }).click()
+    await expect(page.getByText('Смена статуса моих обращений')).toBeVisible()
+    await expect(page.getByText(/не чаще раза в две недели/)).toBeVisible()
+  })
+
+})
+
+/**
+ * Выход — со своей сессией, а не с общей.
+ *
+ * Выход прекращает сессию в базе, а не только чистит cookie. Общая на группу
+ * сессия после этого перестала бы работать и у соседних тестов — то есть
+ * правильно работающий выход ронял бы половину прогона.
+ */
+test('выход прекращает сессию, а не только чистит cookie', async ({ page }) => {
+  await signIn(page, `logout-${Date.now()}@example.com`)
+
+  await page.getByRole('button', { name: 'Выйти' }).click()
+  await expect(page).toHaveURL('/')
+
   await page.goto('/profile')
-
-  await expect(page.getByRole('heading', { name: 'Елена Сорокина' })).toBeVisible()
-  await expect(page.locator('article').first()).toBeVisible()
-
-  await page.getByRole('link', { name: 'За что голосовал' }).click()
-  await expect(page).toHaveURL(/tab=votes/)
-  await expect(page.locator('article').first()).toBeVisible()
-
-  await page.getByRole('link', { name: 'Уведомления' }).click()
-  await expect(page.getByText('Смена статуса моих обращений')).toBeVisible()
-  await expect(page.getByText(/не чаще раза в две недели/)).toBeVisible()
+  await expect(page.getByText(/после входа/)).toBeVisible()
 })
 
 test('гостю профиль предлагает вход, а не пустой экран', async ({ page }) => {
-  await setRole(page, 'guest')
   await page.goto('/profile')
 
   await expect(page.getByText(/после входа/)).toBeVisible()
@@ -112,13 +142,21 @@ test('гостю профиль предлагает вход, а не пуст�
   await expect(page.locator('#main').getByRole('link', { name: 'Войти' })).toBeVisible()
 })
 
-test('переключатель роли меняет то, что видно на портале', async ({ page }) => {
+/**
+ * Вход целиком, от формы до сессии.
+ *
+ * Единственный тест, который проходит весь путь своими руками, а не берёт
+ * готовую сессию: обходного пути в продукте больше нет, и если вход сломан,
+ * сломано всё остальное.
+ */
+test('вход по ссылке из письма открывает сессию', async ({ page }) => {
   await page.goto('/product')
-  const switcher = page.getByTestId('viewer-switcher')
+  await expect(page.getByRole('link', { name: 'Войти' })).toBeVisible()
 
-  await switcher.getByRole('button', { name: 'Гость' }).click()
-  await expect(page.getByRole('link', { name: 'Войти' }).first()).toBeVisible()
+  /* Свой адрес: общий упёрся бы в лимит ссылок при повторных прогонах. */
+  await signIn(page, `fresh-${Date.now()}@example.com`)
 
-  await switcher.getByRole('button', { name: 'Команда' }).click()
+  await page.goto('/product')
   await expect(page.getByRole('link', { name: /Профиль/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Войти' })).toHaveCount(0)
 })

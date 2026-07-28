@@ -1,12 +1,11 @@
 /**
  * КОНТРАКТ СЛОЯ ЗАПРОСОВ.
  *
- * Единственное, что UI знает о данных. Реализаций две — mock/ (фаза A)
- * и db/ (фаза B); сигнатуры между ними не различаются.
+ * Единственное, что UI знает о данных.
  *
  * Правило: view-model плоская и готовая к рендеру. Никаких ORM-объектов
- * и ленивых связей наружу — то, что нельзя отдать из мока, нельзя отдать
- * и из Prisma (docs/08-dev-plan.md).
+ * и ленивых связей наружу: экран получает готовые к рендеру данные
+ * и ничего не знает про Prisma (docs/08-dev-plan.md).
  */
 
 import type { StatusShape } from '@config/statuses'
@@ -63,6 +62,12 @@ export interface PostCardView {
   awaitingReporter: boolean
   /** Голосовал ли текущий пользователь. */
   voted: boolean
+  /**
+   * Обращение ждёт проверки модератором и в ленте не показывается (FR-201).
+   * Собственному автору показывается — с этой пометкой: иначе он видит,
+   * что его обращение исчезло, и пишет второе.
+   */
+  pendingModeration: boolean
   updatedAt: string
   /** Готовая подпись «3 дн. назад»: считается на сервере, чтобы не разъехалась гидратация. */
   updatedLabel: string
@@ -111,7 +116,7 @@ export interface FeedResult extends FeedPage {
 
 export interface PersonView {
   name: string
-  /** Инициалы для аватара-заглушки. */
+  /** Инициалы для аватара без фотографии. */
   initials: string
   role: string
   /** Сотрудник команды: его комментарии визуально отличаются (FR-137). */
@@ -183,6 +188,8 @@ export type PostPageResult =
 
 /** Кандидат во врезке «похожие найдены» (FR-122). */
 export interface SimilarPostView {
+  /** Нужен, чтобы проголосовать прямо из врезки, не открывая обращение. */
+  id: string
   slug: string
   boardSlug: string
   title: string
@@ -305,6 +312,33 @@ export interface ProfileView {
   stats: { authored: number; voted: number; inProgress: number }
 }
 
+/* ────────────────────────── Модерация ────────────────────────── */
+
+/**
+ * Обращение, ждущее проверки (FR-201).
+ *
+ * Показывается целиком, а не карточкой: решение принимается по тексту,
+ * и заставлять модератора открывать каждое обращение отдельной страницей —
+ * значит гарантировать, что очередь не разберут.
+ */
+export interface ModerationItemView {
+  id: string
+  ref: string
+  slug: string
+  boardSlug: string
+  boardName: string
+  title: string
+  /** Тело обращения абзацами. */
+  details: string[]
+  typeName: string
+  authorName: string
+  authorEmail: string
+  /** Сколько обращений автора уже одобрено: у новичка это ноль. */
+  authorApprovedCount: number
+  createdLabel: string
+  ageDays: number
+}
+
 /* ──────────────────────────── Триаж ──────────────────────────── */
 
 export type SlaState = 'answered' | 'ok' | 'soon' | 'overdue' | 'none'
@@ -372,16 +406,24 @@ export interface TriageQueueView {
   facets: { severities: FacetView[]; types: FacetView[] }
 }
 
-/** Контракт. Обе реализации обязаны экспортировать ровно это. */
+/**
+ * Контракт. Обе реализации обязаны экспортировать ровно это.
+ *
+ * `userId` необязателен везде, где ответ зависит от того, кто смотрит:
+ * «я уже голосовал» и «я подписан» — свойства пары (обращение, человек),
+ * а не обращения. Без него метод отвечает как гостю.
+ */
 export interface QueryPort {
   listBoards(): Promise<BoardView[]>
   getBoard(slug: string): Promise<BoardView | null>
-  getFeed(query: FeedQuery): Promise<FeedResult>
-  getPost(boardSlug: string, slug: string): Promise<PostPageResult | null>
-  findSimilar(query: SimilarQuery): Promise<SimilarPostView[]>
+  getFeed(query: FeedQuery, userId?: string): Promise<FeedResult>
+  getPost(boardSlug: string, slug: string, userId?: string): Promise<PostPageResult | null>
+  findSimilar(query: SimilarQuery, userId?: string): Promise<SimilarPostView[]>
   getRoadmap(boardSlug?: string, expandStatusKey?: string): Promise<RoadmapView>
   getChangelog(query: ChangelogQuery): Promise<ChangelogResult>
   getChangelogEntry(slug: string): Promise<ChangelogEntryView | null>
   getProfile(userId: string): Promise<ProfileView>
   getTriageQueue(query: TriageQuery): Promise<TriageQueueView>
+  /** Обращения, ждущие проверки модератором (FR-201). */
+  getModerationQueue(): Promise<ModerationItemView[]>
 }

@@ -8,6 +8,25 @@
 
 const MS_PER_DAY = 86_400_000
 
+/** Сколько символов тела показывается карточкой в ленте. */
+const EXCERPT_LENGTH = 200
+
+/**
+ * Краткое описание для карточки ленты.
+ *
+ * Считается из тела обращения, а не хранится отдельной колонкой: отдельное
+ * поле пришлось бы поддерживать в актуальном состоянии при каждой правке
+ * текста, и оно неизбежно разъехалось бы с содержимым.
+ */
+export function excerptOf(details: string): string {
+  const first = details.split(/\n{2,}/)[0]?.trim() ?? ''
+  if (first.length <= EXCERPT_LENGTH) return first
+  /* Режем по границе слова: обрыв на середине слова читается как ошибка. */
+  const cut = first.slice(0, EXCERPT_LENGTH)
+  const lastSpace = cut.lastIndexOf(' ')
+  return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).replace(/[,;:—-]$/, '')}…`
+}
+
 export function relativeLabel(at: Date, now: Date): string {
   const days = Math.floor((now.getTime() - at.getTime()) / MS_PER_DAY)
   if (days <= 0) return 'сегодня'

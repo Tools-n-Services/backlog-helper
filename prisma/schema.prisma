@@ -1,0 +1,864 @@
+// Схема базы. ОБЩАЯ ДЛЯ ВСЕХ КЛОНОВ — форк её не правит (03-architecture.md, правило 3).
+//
+// Соответствует docs/02-data-model.md целиком, включая backlog_item, insight
+// и attachment: таблицы заводятся сразу, даже без UI. Достроить схему потом
+// дороже, чем завести пустую таблицу сейчас, — а миграция на живых данных
+// стоит уже совсем других денег.
+//
+// Чего здесь намеренно нет — того, что Prisma не умеет выразить: частичных
+// индексов, генерируемой колонки search_tsv, GIN по триграммам и триггеров
+// счётчиков. Всё это лежит отдельной миграцией 20260728000200, и это не
+// «обход ограничения», а следование модели данных: счётчики обязаны
+// обновляться триггером, потому что писать голоса будут четыре разных места.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Connection string живёт в prisma.config.ts — с Prisma 7 в схеме её больше нет.
+datasource db {
+  provider = "postgresql"
+}
+
+/* ─────────────────────────── Перечисления ─────────────────────────── */
+
+enum BoardVisibility {
+  public
+  private
+  readonly
+
+  @@map("board_visibility")
+}
+
+enum Moderation {
+  pending
+  approved
+  rejected
+
+  @@map("moderation")
+}
+
+/// Кто видит тело обращения. Заголовок и статус публичны всегда (FR-561).
+enum Privacy {
+  public
+  reporter_team
+  team_only
+
+  @@map("privacy")
+}
+
+enum Frequency {
+  always
+  sometimes
+  once
+
+  @@map("frequency")
+}
+
+enum Resolution {
+  fixed
+  duplicate
+  not_reproducible
+  by_design
+  wont_fix
+  auto_closed
+
+  @@map("resolution")
+}
+
+enum DefaultSort {
+  trending
+  new
+  affected
+
+  @@map("default_sort")
+}
+
+enum UserRole {
+  user
+  moderator
+  admin
+  owner
+
+  @@map("user_role")
+}
+
+enum AttachmentKind {
+  image
+  video
+  log
+  har
+  other
+
+  @@map("attachment_kind")
+}
+
+enum AttachmentVisibility {
+  public
+  team_only
+
+  @@map("attachment_visibility")
+}
+
+enum SubscriptionSource {
+  vote
+  author
+  comment
+  manual
+
+  @@map("subscription_source")
+}
+
+enum ChangeKind {
+  new
+  improved
+  fixed
+
+  @@map("change_kind")
+}
+
+enum BacklogKind {
+  feature
+  bug
+  tech
+  compliance
+
+  @@map("backlog_kind")
+}
+
+enum BacklogDecision {
+  accepted
+  rejected
+  deferred
+
+  @@map("backlog_decision")
+}
+
+enum InsightSource {
+  call
+  ticket
+  chat
+  interview
+  sales
+  other
+
+  @@map("insight_source")
+}
+
+/* ───────────────────────── Справочники сбора ──────────────────────── */
+
+model Board {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  slug         String          @unique
+  description  String          @default("")
+  visibility   BoardVisibility @default(public)
+  hiddenFromNav Boolean        @default(false) @map("hidden_from_nav")
+  position     Int
+  /// Денормализовано триггером: только одобренные и несмерженные.
+  postCount    Int             @default(0) @map("post_count")
+  requireCategory Boolean      @default(false) @map("require_category")
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime?       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  posts      Post[]
+  categories Category[]
+  tags       Tag[]
+
+  @@map("board")
+}
+
+model Category {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String    @map("board_id") @db.Uuid
+  parentId  String?   @map("parent_id") @db.Uuid
+  name      String
+  slug      String
+  position  Int       @default(0)
+  postCount Int       @default(0) @map("post_count")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board    Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  posts    Post[]
+
+  @@unique([boardId, slug])
+  @@unique([boardId, parentId, name])
+  @@map("category")
+}
+
+model Tag {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String    @map("board_id") @db.Uuid
+  name      String
+  slug      String
+  postCount Int       @default(0) @map("post_count")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  board Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  posts PostTag[]
+
+  @@unique([boardId, name])
+  @@unique([boardId, slug])
+  @@map("tag")
+}
+
+/// Статусы — данные, а не enum в коде: их набор различается между продуктами (FR-231).
+model Status {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key           String    @unique
+  name          String
+  /// Токен темы, не hex — см. правила форка.
+  color         String    @default("")
+  position      Int
+  showOnRoadmap Boolean   @default(false) @map("show_on_roadmap")
+  isTerminal    Boolean   @default(false) @map("is_terminal")
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts           Post[]
+  postTypes       PostType[]
+  statusChangesTo StatusChange[] @relation("StatusChangeTo")
+  statusChangesFrom StatusChange[] @relation("StatusChangeFrom")
+  statusMaps      StatusMap[]
+
+  @@map("status")
+}
+
+model PostType {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key              String      @unique
+  name             String
+  description      String      @default("")
+  /// Набор полей формы: имя, тип, обязательность, подсказка, варианты (FR-502).
+  formSchema       Json        @default("[]") @map("form_schema")
+  allowedStatusIds String[]    @map("allowed_status_ids") @db.Uuid
+  defaultStatusId  String?     @map("default_status_id") @db.Uuid
+  defaultPrivacy   Privacy     @default(public) @map("default_privacy")
+  allowsVotes      Boolean     @default(true) @map("allows_votes")
+  /// «Мне тоже нужно» vs «У меня тоже»: один и тот же голос значит разное.
+  voteLabel        String      @default("") @map("vote_label")
+  defaultSort      DefaultSort @default(trending) @map("default_sort")
+  goesToBacklog    Boolean     @default(true) @map("goes_to_backlog")
+  /// Не попадает в публичную ленту вовсе (FR-507).
+  publicFeed       Boolean     @default(true) @map("public_feed")
+  enabled          Boolean     @default(true)
+  position         Int         @default(0)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  defaultStatus Status?     @relation(fields: [defaultStatusId], references: [id])
+  posts         Post[]
+  slaPolicies   SlaPolicy[]
+
+  @@map("post_type")
+}
+
+model IntakeSource {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String   @unique
+  name        String
+  /// Для email/api — false: чужая переписка не публикуется автоматически (FR-558).
+  autoPublish Boolean  @default(true) @map("auto_publish")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts Post[]
+
+  @@map("intake_source")
+}
+
+/// Политика первого ответа. Применяется при приёме, считает post.sla_due_at (FR-538).
+model SlaPolicy {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postTypeId         String?  @map("post_type_id") @db.Uuid
+  /// null — любая severity.
+  severity           String?
+  firstResponseHours Int      @map("first_response_hours")
+  position           Int      @default(0)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  postType PostType? @relation(fields: [postTypeId], references: [id], onDelete: Cascade)
+
+  @@map("sla_policy")
+}
+
+/* ──────────────────────────── Люди ────────────────────────────── */
+
+model Company {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  domain       String?  @unique
+  memberCount  Int      @default(0) @map("member_count")
+  monthlySpend Decimal? @map("monthly_spend") @db.Decimal(12, 2)
+  customFields Json     @default("{}") @map("custom_fields")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users    AppUser[]
+  insights Insight[]
+
+  @@map("company")
+}
+
+model AppUser {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String    @unique @db.Citext
+  name              String
+  avatarUrl         String?   @map("avatar_url")
+  /// Подпись под именем: должность и масштаб — она объясняет вес мнения.
+  role              String    @default("")
+  accessRole        UserRole  @default(user) @map("access_role")
+  /// Сотрудник команды продукта: его комментарии помечаются отдельно (FR-137).
+  isTeam            Boolean   @default(false) @map("is_team")
+  externalId        String?   @unique @map("external_id")
+  companyId         String?   @map("company_id") @db.Uuid
+  /// Приходят из основного продукта, вход в автооценку приоритета (FR-223).
+  segments          String[]  @default([])
+  notificationPrefs Json      @default("{}") @map("notification_prefs")
+  bannedAt          DateTime? @map("banned_at") @db.Timestamptz(6)
+  /// Причина блокировки показывается самому заблокированному: блокировка
+  /// без объяснения неотличима от удаления аккаунта (FR-204).
+  banReason         String?   @map("ban_reason")
+  /// true → посты не идут в модерацию.
+  trusted           Boolean   @default(false)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company         Company?       @relation(fields: [companyId], references: [id])
+  posts           Post[]         @relation("PostAuthor")
+  assignedPosts   Post[]         @relation("PostAssignee")
+  resolvedPosts   Post[]         @relation("PostResolvedBy")
+  moderatedPosts  Post[]         @relation("PostModeratedBy")
+  votes           Vote[]         @relation("VoteUser")
+  votesOnBehalf   Vote[]         @relation("VoteOnBehalf")
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  commentMentions CommentMention[]
+  subscriptions   Subscription[]
+  statusChanges   StatusChange[]
+  merges          MergeLog[]
+  backlogItems    BacklogItem[]
+  insights        Insight[]
+  sessions        Session[]
+
+  @@map("app_user")
+}
+
+/* ───────────────────────────── Вход ───────────────────────────────── */
+
+/**
+ * Одноразовая ссылка входа (FR-171).
+ *
+ * Хранится ХЕШ токена, а не сам токен: дамп этой таблицы не должен давать
+ * возможность войти под любым пользователем. Сам токен существует только
+ * в письме и в адресной строке.
+ */
+model VerificationToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String    @db.Citext
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  /// Одноразовость: повторный переход по той же ссылке не пускает.
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, createdAt])
+  @@map("verification_token")
+}
+
+/**
+ * Сессия. В базе, а не в подписанном JWT: сессию нужно уметь прекращать —
+ * при выходе, при бане, при смене прав. Токен в cookie ничего об этом
+ * знать не может, пока не истечёт.
+ */
+model Session {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/* ──────────────────────────── Обращения ───────────────────────────── */
+
+model Post {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId    String  @map("board_id") @db.Uuid
+  typeId     String  @map("type_id") @db.Uuid
+  sourceId   String? @map("source_id") @db.Uuid
+  /// null = автор анонимизирован (FR-175).
+  authorId   String? @map("author_id") @db.Uuid
+  title      String
+  /// Уникален в паре с board_id и НЕ меняется при переименовании (FR-182).
+  slug       String
+  /// Человекочитаемая ссылка вида «RTM-4821»: её называют в поддержке
+  /// и в письмах, поэтому она колонка, а не порядковый номер строки.
+  ref        String  @unique
+  details    String  @default("")
+  statusId   String  @map("status_id") @db.Uuid
+  categoryId String? @map("category_id") @db.Uuid
+  /// Свободный формат: «II квартал», «релиз 2.31» (FR-134).
+  eta        String?
+
+  moderation   Moderation @default(approved)
+  /// Кто и когда пропустил обращение в ленту или отклонил его.
+  /// Решение модератора влияет на то, что видят все, — оно обязано быть
+  /// именным, иначе разбирать спорный случай не с кем.
+  moderatedById String?   @map("moderated_by") @db.Uuid
+  moderatedAt   DateTime? @map("moderated_at") @db.Timestamptz(6)
+  /// Не null — пост-указатель: нигде не показывается, отдаёт 301 на целевой.
+  mergedIntoId String?    @map("merged_into_id") @db.Uuid
+  pinned       Boolean    @default(false)
+
+  /// Денормализованы триггерами, а не кодом приложения.
+  voteCount    Int    @default(0) @map("vote_count")
+  commentCount Int    @default(0) @map("comment_count")
+  /// Считается джобой: требует дедупликации пользователей через join-ы (FR-524).
+  affectedCount Int   @default(0) @map("affected_count")
+  trendScore   Float  @default(0) @map("trend_score")
+
+  statusChangedAt DateTime? @map("status_changed_at") @db.Timestamptz(6)
+  impact          Int?      @db.SmallInt
+  confidence      Int?      @db.SmallInt
+  effort          Int?      @db.SmallInt
+  customFields    Json      @default("{}") @map("custom_fields")
+  /// FR-219, не отдаётся публичным API.
+  internalNote    String?   @map("internal_note")
+
+  /// Генерируемая колонка, создаётся миграцией 20260728000200. Prisma её
+  /// не умеет описать, но обязана про неё знать — иначе считает дрейфом.
+  searchTsv Unsupported("tsvector")? @map("search_tsv")
+
+  /* Поля обращений об ошибках — у идей пусты. */
+  /// Оценка РЕПОРТЕРА: blocker / major / minor (FR-511).
+  severity     String?
+  frequency    Frequency?
+  startedAt    String?    @map("started_at")
+  environment  Json?
+  /// Никогда не отдаётся публично (FR-513/514).
+  diagnostics  Json?
+  /// Подпись ошибки для авто-дедупликации (FR-521).
+  fingerprint  String?
+  /// Ссылка на ранее исправленный баг с той же подписью (FR-525).
+  regressionOf String?    @map("regression_of") @db.Uuid
+
+  /* Поля триажа — общие для всех типов. */
+  privacy                 Privacy     @default(public)
+  /// Оценка КОМАНДЫ: p0..p3. Отдельное поле от severity — их слияние ломает
+  /// и триаж, и отчётность (FR-536).
+  priority                String?
+  assigneeId              String?     @map("assignee_id") @db.Uuid
+  firstResponseAt         DateTime?   @map("first_response_at") @db.Timestamptz(6)
+  slaDueAt                DateTime?   @map("sla_due_at") @db.Timestamptz(6)
+  needsInfoSince          DateTime?   @map("needs_info_since") @db.Timestamptz(6)
+  resolution              Resolution?
+  /// Уходит репортеру письмом (FR-535) и показывается во врезке похожих (FR-643).
+  resolutionReasonPublic  String?     @map("resolution_reason_public")
+  resolutionReasonInternal String?    @map("resolution_reason_internal")
+  resolvedById            String?     @map("resolved_by") @db.Uuid
+  resolvedAt              DateTime?   @map("resolved_at") @db.Timestamptz(6)
+  attachmentsPurgeAt      DateTime?   @map("attachments_purge_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board      Board         @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  type       PostType      @relation(fields: [typeId], references: [id])
+  source     IntakeSource? @relation(fields: [sourceId], references: [id])
+  author     AppUser?      @relation("PostAuthor", fields: [authorId], references: [id])
+  status     Status        @relation(fields: [statusId], references: [id])
+  category   Category?     @relation(fields: [categoryId], references: [id])
+  assignee   AppUser?      @relation("PostAssignee", fields: [assigneeId], references: [id])
+  resolvedBy AppUser?      @relation("PostResolvedBy", fields: [resolvedById], references: [id])
+  moderatedBy AppUser?     @relation("PostModeratedBy", fields: [moderatedById], references: [id])
+
+  mergedInto Post?  @relation("PostMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom Post[] @relation("PostMerge")
+  regressionOfPost Post?  @relation("PostRegression", fields: [regressionOf], references: [id])
+  regressions      Post[] @relation("PostRegression")
+
+  votes         Vote[]
+  comments      Comment[]
+  attachments   Attachment[]
+  subscriptions Subscription[]
+  tags          PostTag[]
+  statusChanges StatusChange[]
+  mergeSources  MergeLog[]     @relation("MergeSource")
+  mergeTargets  MergeLog[]     @relation("MergeTarget")
+  backlogLinks  BacklogPost[]
+  changelogLinks ChangelogPost[]
+  insights      Insight[]
+
+  @@unique([boardId, slug])
+  @@index([boardId, statusId])
+  @@index([statusId])
+  @@index([authorId])
+  @@map("post")
+}
+
+model Vote {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId      String   @map("post_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  /// Кто из команды добавил голос за пользователя (FR-218).
+  onBehalfBy  String?  @map("on_behalf_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user     AppUser  @relation("VoteUser", fields: [userId], references: [id], onDelete: Cascade)
+  onBehalf AppUser? @relation("VoteOnBehalf", fields: [onBehalfBy], references: [id])
+
+  /// ГЛАВНЫЙ ИНВАРИАНТ: один пользователь — один голос. Гарантия здесь,
+  /// а не в коде: два параллельных клика проходят проверку в коде оба.
+  @@unique([postId, userId])
+  @@index([userId])
+  @@index([postId, createdAt])
+  @@map("vote")
+}
+
+model Comment {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String    @map("post_id") @db.Uuid
+  authorId  String?   @map("author_id") @db.Uuid
+  /// Одноуровневая вложенность ответов (FR-136).
+  parentId  String?   @map("parent_id") @db.Uuid
+  body      String
+  imageUrls String[]  @default([]) @map("image_urls")
+  /// FR-139: не отдаётся публичным запросам.
+  internal  Boolean   @default(false)
+  pinned    Boolean   @default(false)
+  likeCount Int       @default(0) @map("like_count")
+  /// Soft delete, чтобы не рвать тред.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  post     Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   AppUser?         @relation(fields: [authorId], references: [id])
+  parent   Comment?         @relation("CommentTree", fields: [parentId], references: [id])
+  replies  Comment[]        @relation("CommentTree")
+  likes    CommentLike[]
+  mentions CommentMention[]
+
+  @@index([postId, createdAt])
+  @@map("comment")
+}
+
+model CommentLike {
+  commentId String   @map("comment_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("comment_like")
+}
+
+/// Для рассылки упоминаний (FR-302).
+model CommentMention {
+  commentId String   @map("comment_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@map("comment_mention")
+}
+
+/// Отдельная таблица, а не массив URL: у вложений бага есть тип, срок жизни и права.
+model Attachment {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId       String?              @map("post_id") @db.Uuid
+  commentId    String?              @map("comment_id") @db.Uuid
+  kind         AttachmentKind       @default(other)
+  /// Ключ в объектном хранилище, не публичный URL: отдача только через
+  /// приложение подписанной ссылкой, иначе team_only не соблюсти.
+  storageKey   String               @map("storage_key")
+  mime         String
+  sizeBytes    BigInt               @map("size_bytes")
+  visibility   AttachmentVisibility @default(team_only)
+  /// Retention вложений и диагностики (FR-562).
+  purgeAt      DateTime?            @map("purge_at") @db.Timestamptz(6)
+  scannedAt    DateTime?            @map("scanned_at") @db.Timestamptz(6)
+  scanVerdict  String?              @map("scan_verdict")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([purgeAt])
+  @@map("attachment")
+}
+
+model Subscription {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId         String             @map("post_id") @db.Uuid
+  userId         String             @map("user_id") @db.Uuid
+  source         SubscriptionSource @default(manual)
+  /// Не удаляем строку: иначе повторный голос подпишет заново (FR-305).
+  unsubscribedAt DateTime?          @map("unsubscribed_at") @db.Timestamptz(6)
+  /// Для one-click unsubscribe из письма.
+  token          String             @unique @default(dbgenerated("gen_random_uuid()::text"))
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("subscription")
+}
+
+model PostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tag")
+}
+
+/// История статусов на странице поста (FR-140) и аудит. Письма ставятся
+/// в очередь отсюда, а не из кода смены статуса: падение почты не должно
+/// откатывать статус (FR-309).
+model StatusChange {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId       String    @map("post_id") @db.Uuid
+  fromStatusId String?   @map("from_status_id") @db.Uuid
+  toStatusId   String    @map("to_status_id") @db.Uuid
+  changedById  String?   @map("changed_by") @db.Uuid
+  /// Текст апдейта для подписчиков.
+  note         String?
+  notifiedAt   DateTime? @map("notified_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  fromStatus Status?  @relation("StatusChangeFrom", fields: [fromStatusId], references: [id])
+  toStatus   Status   @relation("StatusChangeTo", fields: [toStatusId], references: [id])
+  changedBy  AppUser? @relation(fields: [changedById], references: [id])
+
+  @@index([postId, createdAt])
+  @@map("status_change")
+}
+
+/// То, что делает возможным unmerge (FR-213).
+model MergeLog {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceId         String   @map("source_id") @db.Uuid
+  targetId         String   @map("target_id") @db.Uuid
+  mergedById       String?  @map("merged_by") @db.Uuid
+  /// Чьи именно голоса переехали — без этого откат вернёт чужие.
+  movedVoteUserIds String[] @map("moved_vote_user_ids") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  source   Post     @relation("MergeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target   Post     @relation("MergeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  mergedBy AppUser? @relation(fields: [mergedById], references: [id])
+
+  @@index([targetId])
+  @@map("merge_log")
+}
+
+/* ──────────────────────────── Changelog ───────────────────────────── */
+
+model ChangelogEntry {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title          String
+  slug           String    @unique
+  version        String?
+  /// Вводка над списком изменений.
+  lead           String    @default("")
+  body           String    @default("")
+  /// Производное поле: набор kind его изменений, денормализован для фильтра ленты.
+  types          String[]  @default([])
+  labels         String[]  @default([])
+  /// null = черновик.
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  scheduledFor   DateTime? @map("scheduled_for") @db.Timestamptz(6)
+  reactionCounts Json      @default("{}") @map("reaction_counts")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  changes ChangelogChange[]
+  posts   ChangelogPost[]
+
+  @@index([publishedAt])
+  @@map("changelog_entry")
+}
+
+/// Запись релиза — не один markdown-блок, а список изменений со своим типом
+/// у каждого: иначе фильтр ленты по типу может ответить только «в этом релизе
+/// что-то исправляли», но не показать что именно (FR-162).
+model ChangelogChange {
+  id       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entryId  String     @map("entry_id") @db.Uuid
+  kind     ChangeKind
+  title    String
+  body     String     @default("")
+  position Int        @default(0)
+
+  entry ChangelogEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, position])
+  @@map("changelog_change")
+}
+
+/// Связь релиза с обращениями (FR-165). Здесь замыкается цикл: авторы
+/// и голосовавшие получают письмо «то, что вы просили, вышло».
+model ChangelogPost {
+  entryId String @map("entry_id") @db.Uuid
+  postId  String @map("post_id") @db.Uuid
+
+  entry ChangelogEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  post  Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, postId])
+  @@map("changelog_post")
+}
+
+/* ───────────────────────────── Бэклог ─────────────────────────────── */
+
+model Theme {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  items BacklogItem[]
+
+  @@map("theme")
+}
+
+model InternalStatus {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String   @unique
+  name       String
+  position   Int
+  isTerminal Boolean  @default(false) @map("is_terminal")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  items      BacklogItem[]
+  statusMaps StatusMap[]
+
+  @@map("internal_status")
+}
+
+/// Маппинг внутреннего статуса на публичный (FR-632). Направление
+/// одностороннее: внутренний → публичный, никогда наоборот.
+model StatusMap {
+  internalStatusId String @map("internal_status_id") @db.Uuid
+  statusId         String @map("status_id") @db.Uuid
+
+  internalStatus InternalStatus @relation(fields: [internalStatusId], references: [id], onDelete: Cascade)
+  status         Status         @relation(fields: [statusId], references: [id], onDelete: Cascade)
+
+  @@id([internalStatusId, statusId])
+  @@map("status_map")
+}
+
+/// Единица работы. НЕ ПОСТ — обоснование разделения в 06-backlog.md, раздел 0.
+model BacklogItem {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Внутренняя формулировка, отличается от публичной.
+  title            String
+  /// Формулировка проблемы, а не решения.
+  problem          String       @default("")
+  /// Техдолг конкурирует за приоритет наравне (FR-605).
+  kind             BacklogKind  @default(feature)
+  themeId          String?      @map("theme_id") @db.Uuid
+  /// Фазы (FR-608).
+  parentId         String?      @map("parent_id") @db.Uuid
+  ownerId          String?      @map("owner_id") @db.Uuid
+  internalStatusId String?      @map("internal_status_id") @db.Uuid
+
+  /// Вычисляется из связанных постов и инсайтов с дедупликацией по
+  /// пользователю, не вводится руками (FR-612).
+  reach      Int      @default(0)
+  impact     Decimal? @db.Decimal(6, 2)
+  confidence Decimal? @db.Decimal(6, 2)
+  effort     Decimal? @db.Decimal(6, 2)
+  /// Хранятся компоненты, чтобы пересчитать при смене формулы.
+  score      Decimal? @db.Decimal(12, 4)
+  /// Ручной порядок дробной индексацией: новый ранг = (a + b) / 2,
+  /// обновляется одна строка вместо всей таблицы.
+  rank       Decimal  @default(0) @db.Decimal(20, 10)
+  /// Сумма monthly_spend затронутых компаний (FR-613).
+  mrrSum     Decimal? @map("mrr_sum") @db.Decimal(14, 2)
+
+  targetRelease    String?   @map("target_release")
+  estimate         String?
+  trackerUrl       String?   @map("tracker_url")
+  trackerStatus    String?   @map("tracker_status")
+  trackerSyncedAt  DateTime? @map("tracker_synced_at") @db.Timestamptz(6)
+
+  decision               BacklogDecision?
+  /// Публичная формулировка уходит голосовавшим (FR-636).
+  decisionReasonPublic   String?          @map("decision_reason_public")
+  decisionReasonInternal String?          @map("decision_reason_internal")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  theme          Theme?          @relation(fields: [themeId], references: [id])
+  parent         BacklogItem?    @relation("BacklogTree", fields: [parentId], references: [id])
+  children       BacklogItem[]   @relation("BacklogTree")
+  owner          AppUser?        @relation(fields: [ownerId], references: [id])
+  internalStatus InternalStatus? @relation(fields: [internalStatusId], references: [id])
+  posts          BacklogPost[]
+  insights       Insight[]
+
+  @@index([rank])
+  @@map("backlog_item")
+}
+
+/// Связь N:M (FR-602): один элемент бэклога закрывает несколько обращений,
+/// одно обращение может питать несколько элементов.
+model BacklogPost {
+  backlogItemId String @map("backlog_item_id") @db.Uuid
+  postId        String @map("post_id") @db.Uuid
+
+  backlogItem BacklogItem @relation(fields: [backlogItemId], references: [id], onDelete: Cascade)
+  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([backlogItemId, postId])
+  @@map("backlog_post")
+}
+
+/// Цитата пользователя из источника вне портала (FR-621).
+model Insight {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Дословный фрагмент, не пересказ.
+  quote         String
+  postId        String?       @map("post_id") @db.Uuid
+  backlogItemId String?       @map("backlog_item_id") @db.Uuid
+  authorId      String?       @map("author_id") @db.Uuid
+  companyId     String?       @map("company_id") @db.Uuid
+  source        InsightSource @default(other)
+  /// Ссылка на исходник: запись звонка, тикет.
+  sourceUrl     String?       @map("source_url")
+  weight        Int           @default(1) @db.SmallInt
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post        Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  backlogItem BacklogItem? @relation(fields: [backlogItemId], references: [id], onDelete: Cascade)
+  author      AppUser?     @relation(fields: [authorId], references: [id])
+  company     Company?     @relation(fields: [companyId], references: [id])
+
+  @@index([postId])
+  @@index([backlogItemId])
+  @@map("insight")
+}

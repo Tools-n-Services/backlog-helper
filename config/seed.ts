@@ -1,12 +1,19 @@
 /**
- * Фикстуры фазы A. ВЫКИДЫВАЕТСЯ В ИТЕРАЦИИ B1 — точнее, переезжает в config/seed.ts
- * и в тесты, а лента начинает читать Postgres.
+ * Демонстрационные данные продукта-примера. ФОРК ЗАМЕНЯЕТ ЭТОТ ФАЙЛ ЦЕЛИКОМ
+ * или удаляет его, если портал стартует с пустой базой.
+ *
+ * Содержимое разворачивается в записи детерминированно: одни и те же входные
+ * данные дают одни и те же даты голосов и комментариев в любом запуске.
+ * Благодаря этому пересев не меняет порядок ленты, и тесты, которые
+ * проверяют сортировку и счётчики, остаются осмысленными.
  *
  * Контент осмысленный, а не lorem: на нём проверяется, что лента читается,
  * заголовки переносятся, а фильтры дают правдоподобные счётчики.
  *
  * Продукт-пример — «Ритмика», планирование смен и графиков.
  */
+
+import { slugify } from '@/core/slug'
 
 export interface PostSeed {
   boardSlug: 'product' | 'bugs' | 'reports'
@@ -772,8 +779,8 @@ export interface CommentSeed {
 
 /**
  * Написанные вручную треды для показательных обращений. Остальные собираются
- * из общего пула ниже: сотня уникальных обсуждений прототипу не нужна,
- * а вот один настоящий — нужен, иначе не видно, как читается тред.
+ * из общего пула ниже: сотня уникальных обсуждений демонстрации не нужна,
+ * а один настоящий — нужен, иначе не видно, как читается тред.
  */
 export const commentThreads: Record<string, CommentSeed[]> = {
   'Экспорт графика в Excel теряет ночные смены': [
@@ -1118,7 +1125,7 @@ export interface TriageSeed {
 }
 
 /**
- * Данные триажа по обращениям. В фазе B это колонки `post` — severity,
+ * Данные триажа по обращениям: ложатся в колонки `post` — severity,
  * frequency, source_id, assignee_id, first_response_at.
  */
 export const triageByTitle: Record<string, TriageSeed> = {
@@ -1195,4 +1202,202 @@ export const triageByTitle: Record<string, TriageSeed> = {
   'Как передать права управляющего на время отпуска': {
     severity: 'minor', frequency: 'once', source: 'email', segment: 'paid',
   },
+}
+
+// ── Разложение фикстур в конкретные записи ──────────────────────────────
+
+/**
+ * Детерминированный PRNG. Не `Math.random()`: и лента на моках, и сид базы
+ * обязаны получить один и тот же набор дат голосов — иначе trend_score
+ * разойдётся, порядок ленты поедет, и «база даёт тот же портал» проверить
+ * будет нечем.
+ */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** Обращение, разложенное из фикстуры: id, slug и возрасты голосов. */
+export interface ExpandedPost {
+  id: string
+  slug: string
+  seed: PostSeed
+  /**
+   * Возрасты ВСЕХ голосов в днях — из них считается trend_score.
+   *
+   * Именно всех, а не выборки: в базе каждый голос обязан быть строкой
+   * с уникальной парой (post_id, user_id), иначе vote_count, который ставит
+   * триггер, разойдётся с числом из фикстуры. Раз в базе они настоящие,
+   * то и на моках считаем по ним же — сравнивать два источника имеет смысл
+   * только на одних и тех же данных. Суммарно это ~14 тысяч чисел.
+   */
+  voteAgesDays: number[]
+  createdAgoDays: number
+  updatedAgoDays: number
+  /** Человекочитаемая ссылка: её называют в поддержке и в письмах. */
+  ref: string
+}
+
+/**
+ * Раскладывает фикстуры в конкретные записи. Чистая функция от индекса:
+ * один и тот же вход даёт один и тот же выход в любом процессе.
+ */
+export function expandPosts(): ExpandedPost[] {
+  return postSeeds.map((seed, i) => {
+    const rand = mulberry32(i * 7919 + 13)
+
+    /* `recency` — доля голосов, набранных за последние две недели: она и делает
+       trending осмысленным, разводя старое популярное и свежее вспыхнувшее. */
+    const recentCount = Math.round(seed.votes * seed.recency)
+    const recentWindow = Math.min(14, seed.ageDays)
+    const voteAgesDays: number[] = []
+
+    for (let v = 0; v < recentCount; v++) {
+      voteAgesDays.push(rand() * recentWindow)
+    }
+    for (let v = recentCount; v < seed.votes; v++) {
+      voteAgesDays.push(recentWindow + rand() * Math.max(0, seed.ageDays - recentWindow))
+    }
+
+    return {
+      id: `post-${String(i + 1).padStart(3, '0')}`,
+      slug: slugify(seed.title),
+      seed,
+      voteAgesDays,
+      createdAgoDays: seed.ageDays,
+      /* Активность подтягивает дату обновления к сегодняшнему дню. */
+      updatedAgoDays: seed.ageDays * (1 - 0.8 * seed.recency),
+      ref: `RTM-${4000 + i * 37}`,
+    }
+  })
+}
+
+/**
+ * Сколько всего нужно голосующих. Голоса за одно обращение обязаны быть
+ * от разных людей — это главный инвариант таблицы vote.
+ */
+export const maxVotesPerPost = postSeeds.reduce((max, s) => Math.max(max, s.votes), 0)
+
+/**
+ * Цепочка статусов, через которые обращение прошло к текущему.
+ *
+ * В базе это строки `status_change` — история на странице обращения (FR-140)
+ * и аудит. Здесь она задана декларативно, потому что фикстура описывает
+ * конечный статус, а путь к нему нужно откуда-то взять.
+ */
+export const statusChains: Record<string, string[]> = {
+  open: ['open'],
+  'needs-info': ['needs-info', 'open'],
+  planned: ['planned', 'open'],
+  building: ['building', 'planned', 'open'],
+  completed: ['completed', 'building', 'planned', 'open'],
+  'not-reproducible': ['not-reproducible', 'needs-info', 'open'],
+  duplicate: ['duplicate', 'open'],
+  'wont-fix': ['wont-fix', 'open'],
+}
+
+/** Значения триажа для обращений, которых нет в `triageByTitle`. */
+export const defaultTriage = {
+  severity: 'minor',
+  frequency: 'sometimes',
+  source: 'portal',
+  segment: 'free',
+} as const
+
+/** Полное тело обращения абзацами: показательное или собранное из краткого. */
+export function detailsFor(seed: PostSeed): string[] {
+  return postDetails[seed.title] ?? [seed.excerpt, detailsTail]
+}
+
+/** Комментарий, разложенный из фикстуры: автор, время, текст, ответы. */
+export interface ExpandedComment {
+  /** Индекс в `people` — реальный человек или сотрудник команды. */
+  author: number
+  agoDays: number
+  body: string
+  likes: number
+  pinned: boolean
+  replies: ExpandedComment[]
+}
+
+function countNodes(nodes: ExpandedComment[]): number {
+  return nodes.reduce((n, c) => n + 1 + countNodes(c.replies), 0)
+}
+
+/**
+ * Раскладывает тред обращения.
+ *
+ * Написанные вручную обсуждения идут первыми, дальше тред добивается репликами
+ * из общего пула до заявленного в фикстуре числа. Добивать обязательно:
+ * `comment_count` в базе ставит триггер по фактическим строкам, и если
+ * материализовать только показательные три комментария, карточка обещающая
+ * «128 комментариев» покажет три. Расхождение счётчика с содержимым —
+ * ровно то, что триггеры и заведены не допускать.
+ */
+export function expandComments(post: ExpandedPost): ExpandedComment[] {
+  const seed = post.seed
+  const rand = mulberry32(seed.title.length * 104729 + 7)
+
+  const fromSeed = (c: CommentSeed): ExpandedComment => ({
+    author: c.author,
+    agoDays: c.agoDays,
+    body: c.body,
+    likes: c.likes,
+    pinned: c.pinned ?? false,
+    replies: (c.replies ?? []).map(fromSeed),
+  })
+
+  const handwritten = (commentThreads[seed.title] ?? []).map(fromSeed)
+  const filler: ExpandedComment[] = []
+  const span = Math.max(1, post.createdAgoDays - post.updatedAgoDays)
+
+  for (let i = countNodes(handwritten); i < seed.comments; i++) {
+    filler.push({
+      /* Последние двое в `people` — команда: их реплики не должны попадать
+         в общий шум, иначе метка «ответ команды» перестанет что-то значить. */
+      author: Math.floor(rand() * (people.length - 2)),
+      agoDays: post.updatedAgoDays + rand() * span,
+      body: genericComments[Math.floor(rand() * genericComments.length)]!,
+      likes: Math.floor(rand() * 12),
+      pinned: false,
+      replies: [],
+    })
+  }
+
+  return [...handwritten, ...filler.sort((a, b) => a.agoDays - b.agoDays)]
+}
+
+/** Смерженный дубликат, разложенный в самостоятельное обращение. */
+export interface ExpandedMerged {
+  title: string
+  slug: string
+  ref: string
+  movedVotes: number
+  /** Заголовок обращения, в которое этот дубликат объединён. */
+  targetTitle: string
+}
+
+/**
+ * Раскладывает объединённые дубликаты сквозным списком.
+ *
+ * Нумерация именно сквозная, а не внутри каждого целевого обращения: ссылка
+ * вида «RTM-5131» уникальна во всём портале, её называют в поддержке, и два
+ * разных обращения с одним номером — это не косметика, а невозможность
+ * понять, о котором из них речь.
+ */
+export function expandMerged(): ExpandedMerged[] {
+  return Object.entries(mergedInto).flatMap(([targetTitle, dupes]) =>
+    dupes.map((d) => ({ ...d, targetTitle })),
+  ).map((d, i) => ({
+    title: d.title,
+    slug: slugify(d.title),
+    ref: `RTM-${5000 + i * 131}`,
+    movedVotes: d.movedVotes,
+    targetTitle: d.targetTitle,
+  }))
 }

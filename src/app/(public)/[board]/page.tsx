@@ -13,6 +13,7 @@ import {
   hasAnyFilter,
   parseFeedQuery,
 } from '@/features/feed/query-params'
+import { isStaff } from '@/core/permissions'
 import { canContribute, getViewer } from '@/core/session'
 import { queries } from '@/queries'
 import { EmptyState } from '@/ui/feed/empty-state'
@@ -45,7 +46,7 @@ export default async function BoardPage({
 
   /* Закрытая доска — не 404: отказ обязан называть причину и следующий шаг
      (07-ui-brief.md, раздел 5). «Не найдено» здесь просто врёт. */
-  if (board.visibility === 'private' && !viewer.isTeam) {
+  if (board.visibility === 'private' && !isStaff(viewer)) {
     return (
       <StateScreen
         title="Доска закрыта"
@@ -65,9 +66,11 @@ export default async function BoardPage({
   }
 
   const searchParamsValue = await searchParams
-  /* Способ показать состояние «лента не загрузилась» в прототипе.
-     Удаляется в B1 вместе с переходом на настоящий источник данных. */
-  if (searchParamsValue['fail']) {
+  /* Экран «лента не загрузилась» — настоящая граница ошибок, и её нужно
+     уметь открыть, чтобы проверить текст и кнопку повтора. Вызвать сбой
+     базы по требованию нельзя, поэтому здесь ручной триггер — строго вне
+     production: в бою это был бы способ уронить страницу любому желающему. */
+  if (process.env.NODE_ENV !== 'production' && searchParamsValue['fail']) {
     throw new Error('Не удалось получить ленту: превышено время ожидания')
   }
 
@@ -121,7 +124,10 @@ async function Feed({
   boardSlug: string
   canVote: boolean
 }) {
-  const feed = await queries.getFeed(query)
+  const viewer = await getViewer()
+  /* Голоса читателя нужны, чтобы кнопка показывала «вы за», а не предлагала
+     проголосовать повторно. */
+  const feed = await queries.getFeed(query, viewer.signedIn ? viewer.id : undefined)
 
   return (
     <div className="grid gap-8 lg:grid-cols-[212px_minmax(0,1fr)]">

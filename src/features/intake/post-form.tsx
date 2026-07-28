@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useState, useTransition } from 'react'
 
@@ -95,9 +96,21 @@ export function PostForm({
     })
   }
 
-  if (result?.ok) return <Sent board={board} refCode={result.ref} moderated={result.moderated} />
+  if (result?.ok) {
+    return (
+      <Sent
+        board={board}
+        refCode={result.ref}
+        slug={result.slug}
+        moderated={result.moderated}
+      />
+    )
+  }
   if (result && !result.ok && result.kind === 'rate-limit') {
     return <LimitReached board={board} limit={result} />
+  }
+  if (result && !result.ok && result.kind === 'auth') {
+    return <NeedsAccess board={board} reason={result.reason} />
   }
 
   const errorList = Object.entries(errors)
@@ -201,13 +214,59 @@ export function PostForm({
 }
 
 /** Что дальше — важнее благодарности: человек должен знать, чего ждать. */
+/**
+ * Отказ по правам после отправки.
+ *
+ * Форма показывается и гостю — иначе неясно, что вообще предлагают заполнить.
+ * Но отправка требует входа, и узнать об этом человек должен вместе
+ * со своим текстом на экране, а не вместо него.
+ */
+function NeedsAccess({
+  board,
+  reason,
+}: {
+  board: BoardView
+  reason: 'unauthorized' | 'banned'
+}) {
+  return (
+    <div className="rounded-card border border-line bg-surface px-6 py-10 text-center">
+      <h2 className="text-h3 font-bold text-ink">
+        {reason === 'banned' ? 'Аккаунт заблокирован' : 'Нужен вход'}
+      </h2>
+      <p className="mx-auto mt-2 max-w-[48ch] text-body text-muted">
+        {reason === 'banned'
+          ? 'Создавать обращения с заблокированного аккаунта нельзя. Читать портал при этом можно.'
+          : 'Обращение подписывается вашим именем — команда должна знать, к кому вернуться с вопросом.'}
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {reason === 'unauthorized' && (
+          <Link
+            href="/login"
+            className="rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface"
+          >
+            Войти
+          </Link>
+        )}
+        <Link
+          href={`/${board.slug}`}
+          className="rounded-pill border border-line px-5 py-2.5 text-small font-semibold text-ink-2"
+        >
+          Читать обращения
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 function Sent({
   board,
   refCode,
+  slug,
   moderated,
 }: {
   board: BoardView
   refCode: string
+  slug: string
   moderated: boolean
 }) {
   return (
@@ -220,17 +279,19 @@ function Sent({
           : 'Мы напишем на почту, когда команда ответит или изменит статус.'}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {/* Обращение теперь существует по своему адресу — первым делом
+            даём на него посмотреть, а не отправляем обратно в ленту. */}
         <Link
-          href={`/${board.slug}`}
+          href={`/${board.slug}/p/${slug}` as Route}
           className="rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface"
         >
-          Вернуться к ленте
+          Открыть обращение
         </Link>
         <Link
-          href={`/${board.slug}/new`}
+          href={`/${board.slug}`}
           className="rounded-pill border border-line px-5 py-2.5 text-small font-semibold text-ink-2"
         >
-          Создать ещё одно
+          Вернуться к ленте
         </Link>
       </div>
     </div>

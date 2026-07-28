@@ -1,5 +1,22 @@
 import { expect, test, type Page } from '@playwright/test'
 
+import { stateFor } from './global-setup'
+
+/* Все сценарии файла — от имени вошедшего участника: голосовать
+   и создавать обращения гость не может, и это проверяется отдельно
+   в states.spec.ts. */
+test.use({ storageState: stateFor('user') })
+
+/**
+ * Последовательно, а не параллельно.
+ *
+ * Обращения теперь создаются по-настоящему, и лимит «не больше двух в час»
+ * считается по автору. Все сценарии этого файла работают от одного
+ * демонстрационного пользователя, поэтому параллельный запуск означает,
+ * что они делят лимит между собой и мешают друг другу непредсказуемо.
+ */
+test.describe.configure({ mode: 'serial' })
+
 async function fillBug(page: Page, title: string) {
   await page.locator('#field-title').fill(title)
   await page.locator('#field-actual').fill('Часы после полуночи не переносятся на следующую дату')
@@ -38,7 +55,7 @@ test('окружение подставляется само и разворач
 
   const block = page.getByRole('button', { name: /проверить|свернуть/ })
   await expect(block).toBeVisible()
-  /* Что-то уже собрано: пустая заглушка означала бы, что автосбор не сработал. */
+  /* Что-то уже собрано: пустой блок означал бы, что автосбор не сработал. */
   await expect(block).not.toContainText('Данные не собрались')
 
   await block.click()
@@ -60,9 +77,18 @@ test('похожие находятся на вводе заголовка и п
   })
   await expect(candidate).toBeVisible()
 
-  const voteInstead = page.getByRole('button', { name: 'Голосовать за это' }).first()
-  await voteInstead.click()
-  await expect(page.getByRole('button', { name: 'Ваш голос учтён' })).toBeVisible()
+  /* Голос из врезки настоящий, и демонстрационный пользователь мог уже
+     голосовать за это обращение — проверяем переключение, а не исходное
+     состояние. */
+  const card = page.locator('article', { has: candidate })
+  const voteButton = card.getByRole('button')
+  const votedAtStart = (await voteButton.getAttribute('aria-pressed')) === 'true'
+
+  await voteButton.click()
+  await expect(voteButton).toHaveAttribute('aria-pressed', String(!votedAtStart))
+  await expect(voteButton).toHaveText(
+    votedAtStart ? 'Голосовать за это' : 'Ваш голос учтён',
+  )
 })
 
 test('на бессмысленный заголовок похожие не предлагаются', async ({ page }) => {
@@ -85,14 +111,23 @@ test('пустая форма показывает ошибки у полей и
   await expect(page.locator('#field-title')).toHaveAttribute('aria-invalid', 'true')
 })
 
-test('заполненная форма отправляется и объясняет, что дальше', async ({ page }) => {
+test('заполненная форма создаёт обращение, которое открывается по ссылке', async ({
+  page,
+}) => {
   await page.goto('/bugs/new?type=bug')
-  await fillBug(page, 'Табель не сходится с графиком в марте')
+  const title = `Табель не сходится с графиком в марте ${Date.now()}`
+  await fillBug(page, title)
   await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
   await expect(page.getByText('Обращение отправлено')).toBeVisible()
-  await expect(page.getByText(/после проверки/)).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Вернуться к ленте' })).toBeVisible()
+  /* Номер обращения — то, что называют в поддержке, поэтому он на экране. */
+  await expect(page.getByText(/^RTM-\d+$/)).toBeVisible()
+
+  /* Обращение теперь существует по своему адресу — это и проверяем,
+     а не только надпись об успехе. */
+  await page.getByRole('link', { name: 'Открыть обращение' }).click()
+  await expect(page).toHaveURL(/\/bugs\/p\//, { timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: title })).toBeVisible()
 })
 
 test('превышение лимита объясняет причину и срок, а не падает', async ({ page }) => {

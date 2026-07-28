@@ -9,6 +9,12 @@ build/
 next-env.d.ts
 *.tsbuildinfo
 
+# локальный кластер postgres и его журнал
+.data/
+
+# клиент Prisma генерируется из схемы на postinstall
+/src/generated/
+
 # окружение
 .env
 .env.local

@@ -6,6 +6,10 @@
  * состояния таймера для очереди.
  */
 
+/* `severity` принимается строкой, а не объединением `SeverityKey`: в базе это
+   текстовая колонка, потому что набор severity различается между продуктами.
+   Незнакомое значение просто не находит частной политики и попадает
+   в общее правило — это лучше, чем приведение типа на месте вызова. */
 import { slaPolicies, slaWarningHours, type SeverityKey } from '@config/scoring'
 
 const MS_PER_HOUR = 3_600_000
@@ -16,7 +20,7 @@ const MS_PER_HOUR = 3_600_000
  */
 export function firstResponseHours(
   typeKey: string,
-  severity: SeverityKey | null,
+  severity: SeverityKey | string | null,
 ): number | null {
   const policy = slaPolicies.find(
     (p) =>
@@ -29,7 +33,7 @@ export function firstResponseHours(
 export function slaDueAt(
   createdAt: Date,
   typeKey: string,
-  severity: SeverityKey | null,
+  severity: SeverityKey | string | null,
 ): Date | null {
   const hours = firstResponseHours(typeKey, severity)
   return hours === null ? null : new Date(createdAt.getTime() + hours * MS_PER_HOUR)

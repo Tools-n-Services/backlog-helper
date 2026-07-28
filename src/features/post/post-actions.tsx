@@ -1,7 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+
+import { subscriptionAction } from './actions'
 
 /**
  * Действия над обращением: подписка (FR-142) и копирование ссылки (FR-143).
@@ -10,14 +13,32 @@ import { useState } from 'react'
  * подтверждение называет результат — «Скопировать ссылку» → «Скопировано».
  */
 export function PostActions({
+  postId,
   subscribed: initialSubscribed,
   signedIn,
 }: {
+  postId: string
   subscribed: boolean
   signedIn: boolean
 }) {
+  const router = useRouter()
   const [subscribed, setSubscribed] = useState(initialSubscribed)
   const [copied, setCopied] = useState(false)
+  const [, startTransition] = useTransition()
+
+  const toggle = () => {
+    const next = !subscribed
+    setSubscribed(next)
+    startTransition(async () => {
+      const result = await subscriptionAction(postId)
+      if (result.ok) {
+        setSubscribed(result.subscribed)
+        return
+      }
+      setSubscribed(!next)
+      if (result.reason === 'unauthorized') router.push('/login')
+    })
+  }
 
   const copy = async () => {
     try {
@@ -37,7 +58,7 @@ export function PostActions({
       {signedIn ? (
         <button
           type="button"
-          onClick={() => setSubscribed((s) => !s)}
+          onClick={toggle}
           aria-pressed={subscribed}
           className={
             `${button} ` +

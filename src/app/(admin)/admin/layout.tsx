@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { product } from '@config/product'
+import { isStaff } from '@/core/permissions'
 import { getViewer } from '@/core/session'
 import { Avatar } from '@/ui/primitives/avatar'
 import { StateScreen } from '@/ui/layout/state-screen'
@@ -21,15 +22,17 @@ export default async function AdminLayout({
 }) {
   const viewer = await getViewer()
 
-  if (!viewer.isTeam) {
+  /* Доступ по полномочию, а не по признаку «сотрудник команды»: команда —
+     это про пометку комментариев, а не про право открыть триаж. */
+  if (!isStaff(viewer)) {
     return (
       <StateScreen
         title="Раздел для команды"
         actions={<PrimaryAction href="/">Вернуться на портал</PrimaryAction>}
       >
         <p>
-          Триаж и бэклог видны только сотрудникам. В прототипе роль
-          переключается внизу публичных страниц.
+          Триаж и модерация видны только команде. Если доступ нужен —
+          попросите администратора портала выдать роль.
         </p>
       </StateScreen>
     )
@@ -49,6 +52,12 @@ export default async function AdminLayout({
           <nav aria-label="Разделы" className="flex items-center gap-0.5">
             <AdminTab href="/admin/triage" contour="triage">
               Триаж
+            </AdminTab>
+            <AdminTab href="/admin/moderation" contour="intake">
+              Модерация
+            </AdminTab>
+            <AdminTab href="/admin/people" contour="backlog">
+              Люди
             </AdminTab>
           </nav>
 
@@ -71,7 +80,7 @@ function AdminTab({
   contour,
   children,
 }: {
-  href: '/admin/triage'
+  href: '/admin/triage' | '/admin/moderation' | '/admin/people'
   contour: 'intake' | 'triage' | 'backlog'
   children: React.ReactNode
 }) {

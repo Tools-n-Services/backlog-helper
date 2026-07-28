@@ -21,6 +21,7 @@ export function PostCard({
   return (
     <article className="flex gap-4 rounded-card border border-line bg-surface p-4 transition-shadow hover:shadow-flat">
       <VoteControl
+        postId={post.id}
         count={post.count}
         type={post.type}
         voted={post.voted}
@@ -38,6 +39,16 @@ export function PostCard({
           )}
           {post.pinned && (
             <span className="text-[11px] font-semibold text-faint">закреплено</span>
+          )}
+          {/* Видно только автору в его профиле: в ленте таких обращений нет.
+              Без этой пометки отправленное обращение выглядит пропавшим. */}
+          {post.pendingModeration && (
+            <span
+              className="text-[11px] font-semibold"
+              style={{ color: 'var(--color-signal-pending)' }}
+            >
+              на проверке
+            </span>
           )}
           {post.privacy !== 'public' && (
             <span

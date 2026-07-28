@@ -18,19 +18,27 @@ import {
   type SeverityKey,
 } from '@config/scoring'
 
+/**
+ * Ключи приходят строками, а не объединениями `SeverityKey`/`FrequencyKey`:
+ * в базе это текстовые колонки, потому что набор severity различается между
+ * продуктами (форк правит config/scoring.ts). Веса ищутся по конфигурации
+ * и подставляют разумное значение для незнакомого ключа — это лучше, чем
+ * приводить строку из базы к типу приведением на месте вызова и делать вид,
+ * что данные уже проверены.
+ */
 export interface PriorityInput {
-  severity: SeverityKey | null
-  frequency: FrequencyKey | null
+  severity: SeverityKey | string | null
+  frequency: FrequencyKey | string | null
   affectedCount: number
   /** Сегмент репортера: enterprise / paid / free. */
   segment: string
 }
 
-export function severityWeight(key: SeverityKey | null): number {
+export function severityWeight(key: SeverityKey | string | null): number {
   return severities.find((s) => s.key === key)?.weight ?? 1
 }
 
-export function frequencyWeight(key: FrequencyKey | null): number {
+export function frequencyWeight(key: FrequencyKey | string | null): number {
   return frequencies.find((f) => f.key === key)?.weight ?? 0.6
 }
 

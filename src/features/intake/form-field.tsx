@@ -205,7 +205,7 @@ function EnvironmentField({
   )
 }
 
-/** Вложения. В фазе A файлы не загружаются — хранилище появится в фазе B. */
+/** Вложения. Загрузка в объектное хранилище ещё не подключена (FR-512). */
 function AttachmentsField({ id }: { id: string }) {
   const [names, setNames] = useState<string[]>([])
 

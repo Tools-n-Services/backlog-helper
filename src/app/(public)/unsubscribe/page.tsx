@@ -12,17 +12,38 @@ export const metadata: Metadata = {
 }
 
 /**
- * Отписка по ссылке из письма (FR-305).
+ * Результат отписки (FR-305).
  *
- * Работает БЕЗ входа и в один клик — это требование RFC 8058 и здравого
- * смысла: если отписка требует вспомнить пароль, человек нажмёт «спам»,
- * и следующие письма продукта не увидит уже никто.
+ * Саму отписку выполняет `/unsubscribe/confirm` — здесь только экран.
+ * Разделение не формальное: отписка меняет данные, а рендер страницы Next
+ * вправе повторить.
  */
 export default async function UnsubscribePage({
   searchParams,
 }: PageProps<'/unsubscribe'>) {
-  const { post } = await searchParams
+  const { post, status } = await searchParams
   const postTitle = Array.isArray(post) ? post[0] : post
+  const unknown = (Array.isArray(status) ? status[0] : status) === 'unknown'
+
+  if (unknown) {
+    return (
+      <StateScreen
+        title="Ссылка не подошла"
+        actions={
+          <>
+            <PrimaryAction href="/profile">Настроить письма</PrimaryAction>
+            <SecondaryAction href="/">Вернуться на портал</SecondaryAction>
+          </>
+        }
+        note="Возможно, ссылка скопирована не целиком или подписку уже удалили."
+      >
+        <p>
+          Отписаться по этой ссылке не получилось. Все письма можно настроить
+          в профиле — там же видно, за какими обращениями вы следите.
+        </p>
+      </StateScreen>
+    )
+  }
 
   return (
     <StateScreen
@@ -33,7 +54,7 @@ export default async function UnsubscribePage({
           <SecondaryAction href="/">Вернуться на портал</SecondaryAction>
         </>
       }
-      note="Отписка сработала без входа — по одноразовой ссылке из письма."
+      note="Отписка сработала без входа — по ссылке из письма."
     >
       <p>
         {postTitle

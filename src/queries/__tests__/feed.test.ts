@@ -1,6 +1,6 @@
 /**
  * Тесты контракта ленты. Написаны против @/queries, а не против моков:
- * после итерации B1 те же тесты должны проходить на Postgres.
+ * читается на настоящих данных из Postgres.
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
@@ -85,13 +85,23 @@ describe('лента', () => {
   it('trending ставит свежие голоса выше старых накоплений', async () => {
     const top = await queries.getFeed(base({ sort: 'top', limit: 50 }))
     const trending = await queries.getFeed(base({ sort: 'trending', limit: 50 }))
-    const byVotes = top.items.filter((p) => !p.pinned)
-    const byTrend = trending.items.filter((p) => !p.pinned)
+
     assert.notEqual(
-      byVotes[0]?.id,
-      byTrend[0]?.id,
-      'если порядок совпал, затухание не работает',
+      top.items.map((p) => p.id).join(),
+      trending.items.map((p) => p.id).join(),
+      'если порядок совпал целиком, затухание не работает',
     )
+
+    /* Проверяется само свойство затухания, а не первое место: у двух лидеров
+       доли свежих голосов почти равны, и кто из них наверху — вопрос
+       случайного разброса дат, а не работы формулы. Настоящий признак —
+       обгон: обращение с меньшим числом голосов стоит выше того, у кого
+       их больше, потому что набрало их недавно. */
+    const rows = trending.items.filter((p) => !p.pinned)
+    const overtakes = rows.some((row, i) =>
+      rows.slice(i + 1).some((below) => row.count < below.count),
+    )
+    assert.ok(overtakes, 'ни одно свежее обращение не обогнало более популярное')
   })
 
   it('закреплённые обращения всегда сверху', async () => {

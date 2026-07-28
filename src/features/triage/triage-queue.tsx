@@ -1,10 +1,24 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from 'react'
 
 import { formatCount } from '@/core/content'
+import {
+  DECISIONS as DECISION_SPECS,
+  type DecisionSpec,
+} from '@/core/domain/triage/decision-specs'
 import type { TriageRowView } from '@/queries/types'
+
+import { decideAction } from './actions'
+import { MergeDialog } from './merge-dialog'
 
 /**
  * Очередь триажа — главный экран продукта.
@@ -13,27 +27,35 @@ import type { TriageRowView } from '@/queries/types'
  * поэтому очередь обязана проходиться целиком с клавиатуры
  * (07-ui-brief.md, разделы 1 и 6).
  *
- * Решения в фазе A применяются в памяти: запись в БД и письма с причиной —
- * это фаза C. Но набор решений и их горячие клавиши уже настоящие (FR-532).
+ * Решение меняет публичный статус, пишется в историю и — для отказных —
+ * требует причины, которая уйдёт автору (FR-532, FR-535). Строка уходит
+ * из очереди сразу, не дожидаясь ответа сервера, и возвращается обратно,
+ * если запись не прошла.
  */
 
-interface Decision {
-  key: string
+/**
+ * Горячая клавиша решения. Само решение и его последствия в данных описаны
+ * в домене (`core/domain/triage/decisions.ts`) — здесь только раскладка:
+ * какой цифрой оно вызывается.
+ */
+interface Decision extends DecisionSpec {
   digit: string
-  label: string
-  /** Требует текста причины, который уйдёт репортеру (FR-535). */
-  needsReason: boolean
 }
 
-const DECISIONS: Decision[] = [
-  { key: 'confirm', digit: '1', label: 'Подтвердить', needsReason: false },
-  { key: 'needs-info', digit: '2', label: 'Запросить информацию', needsReason: true },
-  { key: 'not-reproducible', digit: '3', label: 'Не воспроизводится', needsReason: true },
-  { key: 'by-design', digit: '4', label: 'Так задумано', needsReason: true },
-  { key: 'duplicate', digit: '5', label: 'Дубликат', needsReason: false },
-  { key: 'wont-fix', digit: '6', label: 'Не будем делать', needsReason: true },
-  { key: 'backlog', digit: '7', label: 'В бэклог', needsReason: false },
-]
+const DIGITS: Record<string, string> = {
+  confirm: '1',
+  'needs-info': '2',
+  'not-reproducible': '3',
+  'by-design': '4',
+  duplicate: '5',
+  'wont-fix': '6',
+  backlog: '7',
+}
+
+const DECISIONS: Decision[] = DECISION_SPECS.filter((d) => DIGITS[d.key]).map((d) => ({
+  ...d,
+  digit: DIGITS[d.key]!,
+}))
 
 const SLA_LABELS: Record<TriageRowView['sla']['state'], string> = {
   overdue: 'просрочено',
@@ -50,6 +72,7 @@ export function TriageQueue({ rows }: { rows: TriageRowView[] }) {
   const [helpOpen, setHelpOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const [, startTransition] = useTransition()
 
   const visible = rows.filter((row) => !decided[row.id])
   const current = visible[Math.min(cursor, visible.length - 1)]
@@ -65,11 +88,62 @@ export function TriageQueue({ rows }: { rows: TriageRowView[] }) {
     [visible.length],
   )
 
-  const decide = useCallback(
-    (rowId: string, decision: Decision) => {
-      setDecided((d) => ({ ...d, [rowId]: decision.label }))
+  /**
+   * Решение, ожидающее причины.
+   *
+   * Причина уходит репортеру письмом (FR-535), поэтому отказ без неё
+   * не отправляется вовсе: закрытое молча обращение — это человек,
+   * который больше не напишет.
+   */
+  const [pending, setPending] = useState<{ row: TriageRowView; decision: Decision } | null>(
+    null,
+  )
+  const [failed, setFailed] = useState<string | null>(null)
+  /* Объединение вынесено из набора решений: «Дубликат» помечает обращение,
+     а слияние переносит голоса и комментарии — это разные по цене действия,
+     и путать их одной цифрой нельзя. */
+  const [merging, setMerging] = useState<TriageRowView | null>(null)
+
+  const send = useCallback(
+    (row: TriageRowView, decision: Decision, reason: string) => {
+      /* Строка уходит из очереди сразу: оператор разбирает сотню в день,
+         и ожидание ответа сервера на каждой — это и есть та работа,
+         ради ускорения которой очередь сделана. */
+      setDecided((d) => ({ ...d, [row.id]: decision.label }))
+      setPending(null)
+      setFailed(null)
+
+      startTransition(async () => {
+        const result = await decideAction(row.id, decision.key, reason)
+        if (result.ok) return
+        /* Не записалось — возвращаем в очередь: показывать «разобрано» там,
+           где ничего не изменилось, хуже, чем показать ошибку. */
+        setDecided((d) => {
+          const rest = { ...d }
+          delete rest[row.id]
+          return rest
+        })
+        setFailed(
+          result.reason === 'forbidden'
+            ? 'Недостаточно прав: решения принимает команда.'
+            : `Решение по ${row.ref} не сохранено.`,
+        )
+      })
     },
     [],
+  )
+
+  const decide = useCallback(
+    (rowId: string, decision: Decision) => {
+      const row = rows.find((r) => r.id === rowId)
+      if (!row) return
+      if (decision.needsReason) {
+        setPending({ row, decision })
+        return
+      }
+      send(row, decision, '')
+    },
+    [rows, send],
   )
 
   useEffect(() => {
@@ -112,6 +186,12 @@ export function TriageQueue({ rows }: { rows: TriageRowView[] }) {
           event.preventDefault()
           setHelpOpen((v) => !v)
           return
+        case 'm':
+          if (current) {
+            event.preventDefault()
+            setMerging(current)
+          }
+          return
       }
 
       const decision = DECISIONS.find((d) => d.digit === event.key)
@@ -125,8 +205,24 @@ export function TriageQueue({ rows }: { rows: TriageRowView[] }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [current, decide, move, router])
 
+  /**
+   * Готовность к работе с клавиатуры.
+   *
+   * Разметка очереди приезжает с сервера, а обработчик клавиш навешивается
+   * только после гидратации — до неё стрелки и цифры не делают ничего.
+   * Поверхность, которая обещает полное управление с клавиатуры, обязана
+   * говорить, когда оно включилось: на это опираются и проверки, и сам
+   * оператор, если очередь открылась на медленном соединении.
+   */
+  const ready = useSyncExternalStore(
+    /* Значение не меняется после гидратации — подписываться не на что. */
+    () => () => {},
+    () => true,
+    () => false,
+  )
+
   return (
-    <div>
+    <div data-queue-ready={ready ? 'true' : 'false'}>
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2">
         <label htmlFor="triage-search" className="sr-only">
           Поиск по очереди
@@ -193,12 +289,43 @@ export function TriageQueue({ rows }: { rows: TriageRowView[] }) {
         </p>
       )}
 
-      {current && <DecisionBar row={current} onDecide={(d) => decide(current.id, d)} />}
+      {merging && (
+        <MergeDialog
+          row={merging}
+          onCancel={() => setMerging(null)}
+          onDone={(movedVotes) => {
+            setDecided((d) => ({ ...d, [merging.id]: `объединено, голосов: ${movedVotes}` }))
+            setMerging(null)
+          }}
+        />
+      )}
+
+      {pending && !merging && (
+        <ReasonPrompt
+          row={pending.row}
+          decision={pending.decision}
+          onCancel={() => setPending(null)}
+          onSubmit={(reason) => send(pending.row, pending.decision, reason)}
+        />
+      )}
+
+      {current && !pending && !merging && (
+        <DecisionBar row={current} onDecide={(d) => decide(current.id, d)} />
+      )}
+
+      {failed && (
+        <p
+          role="alert"
+          className="border-t border-line px-4 py-2 text-small"
+          style={{ color: 'var(--color-signal-error)' }}
+        >
+          {failed}
+        </p>
+      )}
 
       {Object.keys(decided).length > 0 && (
         <p className="border-t border-line px-4 py-2 text-small text-faint">
-          Решений принято: {formatCount(Object.keys(decided).length)}. В прототипе
-          они не сохраняются — запись и письма с причиной появятся в фазе C.
+          Решений принято: {formatCount(Object.keys(decided).length)}.
         </p>
       )}
     </div>
@@ -363,6 +490,70 @@ function DecisionBar({
   )
 }
 
+/**
+ * Причина отказа.
+ *
+ * Отдельным шагом, а не необязательным полем рядом с кнопкой: необязательное
+ * поле в плотной очереди не заполняет никто, и до репортера уезжает
+ * «не будем делать» без единого слова.
+ */
+function ReasonPrompt({
+  row,
+  decision,
+  onSubmit,
+  onCancel,
+}: {
+  row: TriageRowView
+  decision: Decision
+  onSubmit: (reason: string) => void
+  onCancel: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const ready = reason.trim().length >= 3
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (ready) onSubmit(reason)
+      }}
+      className="sticky bottom-0 border-t border-line bg-surface px-4 py-3"
+    >
+      <label htmlFor="triage-reason" className="text-small text-muted">
+        <span className="font-semibold text-ink">{decision.label}</span> · {row.ref} —
+        причина уйдёт автору письмом
+      </label>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          id="triage-reason"
+          autoFocus
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onCancel()
+          }}
+          placeholder="Например: воспроизводится только со старой версией приложения"
+          className="h-8 min-w-0 flex-1 rounded-field border border-line bg-surface px-2.5 text-small text-ink-2 placeholder:text-faint"
+        />
+        <button
+          type="submit"
+          disabled={!ready}
+          className="rounded-field bg-ink px-3 py-1.5 text-small font-semibold text-surface disabled:opacity-40"
+        >
+          Отправить решение
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-field border border-line px-3 py-1.5 text-small text-ink-2 hover:bg-track"
+        >
+          Отмена
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function Shortcuts() {
   const rows: [string, string][] = [
     ['↑ ↓ / j k', 'перемещение по очереди'],
@@ -370,6 +561,7 @@ function Shortcuts() {
     ['1 … 7', 'решение по обращению'],
     ['/', 'поиск'],
     ['Esc', 'выйти из поиска'],
+    ['m', 'объединить с другим'],
     ['?', 'эта подсказка'],
   ]
   return (

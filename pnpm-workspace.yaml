@@ -1,3 +1,13 @@
 onlyBuiltDependencies:
   - sharp
   - unrs-resolver
+  # Postinstall качает бинарники Postgres и движки Prisma. Без разрешения
+  # pnpm их молча пропускает, и на чистом клоне `pnpm db:up` падает.
+  - '@embedded-postgres/darwin-arm64'
+  - '@embedded-postgres/darwin-x64'
+  - '@embedded-postgres/linux-arm64'
+  - '@embedded-postgres/linux-x64'
+  - '@embedded-postgres/windows-x64'
+  - '@prisma/engines'
+  - prisma
+  - esbuild

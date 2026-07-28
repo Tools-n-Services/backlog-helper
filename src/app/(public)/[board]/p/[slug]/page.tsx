@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { formatCount, plural } from '@/core/content'
 import { canContribute, getViewer } from '@/core/session'
+import { submitCommentForm } from '@/features/post/actions'
 import { PostActions } from '@/features/post/post-actions'
 import { VoteControl } from '@/features/post/vote-control'
 import { queries } from '@/queries'
@@ -44,16 +45,16 @@ export async function generateMetadata({
 
 export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'>) {
   const { board: boardSlug, slug } = await params
+  const viewer = await getViewer()
   const [board, result] = await Promise.all([
     queries.getBoard(boardSlug),
-    queries.getPost(boardSlug, slug),
+    queries.getPost(boardSlug, slug, viewer.signedIn ? viewer.id : undefined),
   ])
   if (!board || !result) notFound()
 
   if (result.kind === 'merged') return <MergedNotice result={result} />
 
   const post = result
-  const viewer = await getViewer()
 
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-8 md:px-8 lg:px-10">
@@ -76,6 +77,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
         <div className="min-w-0">
           <div className="flex gap-5">
             <VoteControl
+              postId={post.id}
               count={post.count}
               type={post.type}
               voted={post.voted}
@@ -128,7 +130,11 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                 <p className="text-small text-faint">{post.author.role}</p>
               </div>
             </div>
-            <PostActions subscribed={post.subscribed} signedIn={canContribute(viewer)} />
+            <PostActions
+              postId={post.id}
+              subscribed={post.subscribed}
+              signedIn={canContribute(viewer)}
+            />
           </div>
 
           <section className="mt-10">
@@ -140,7 +146,13 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
             </h2>
 
             {viewer.signedIn ? (
-              <form className="mb-8 flex items-start gap-3">
+              /* Обычная форма с серверным действием, без клиентского
+                 состояния: тред рендерится на сервере, и после отправки
+                 страницу всё равно нужно перечитать. */
+              <form
+                action={submitCommentForm.bind(null, post.id, board.slug, slug)}
+                className="mb-8 flex items-start gap-3"
+              >
                 <Avatar initials={viewer.initials} />
                 <div className="min-w-0 flex-1">
                   <label htmlFor="comment" className="sr-only">
@@ -148,7 +160,10 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                   </label>
                   <textarea
                     id="comment"
+                    name="body"
                     rows={3}
+                    required
+                    minLength={2}
                     placeholder="Добавьте детали, которые помогут разобраться"
                     className="w-full resize-y rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2 placeholder:text-faint"
                   />
@@ -194,7 +209,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
  * (07-ui-brief.md, раздел 5).
  *
  * Отдельный вопрос — 301 для поисковиков и старых писем (FR-212): он появится
- * в фазе B вместе с настоящими адресами, здесь важен именно видимый экран.
+ * настоящим редиректом, а здесь важен именно видимый экран с объяснением.
  */
 function MergedNotice({ result }: { result: PostMergedView }) {
   return (

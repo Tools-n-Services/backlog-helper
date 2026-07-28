@@ -1,39 +1,83 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useRef, useState, useTransition } from 'react'
 
 import { formatCount, plural } from '@/core/content'
 import type { PostTypeView } from '@/queries/types'
+
+import { voteAction } from './actions'
 
 /**
  * Кнопка голоса со счётчиком (FR-118, FR-132).
  *
  * Голос — переключатель, а не инкремент: повторное нажатие снимает свой голос
- * и вернуть счётчик обязано ровно к исходному. В фазе B гарантию даёт уникальный
- * индекс `(post_id, user_id)` в БД, а не проверка в коде (NFR-03) — здесь же
- * важно, чтобы этого не нарушал сам интерфейс.
+ * и вернуть счётчик обязано ровно к исходному. Гарантию даёт уникальный
+ * индекс `(post_id, user_id)` в базе, а не проверка в коде (NFR-03) — здесь
+ * важно лишь, чтобы этого не нарушал сам интерфейс.
  *
  * Обновление оптимистичное: ответа сервера не ждём, иначе на ленте из двадцати
  * карточек голосование ощущается сломанным.
  */
 export function VoteControl({
+  postId,
   count,
   type,
   voted: initialVoted,
   signedIn,
   variant = 'card',
 }: {
+  postId: string
   count: number
   type: PostTypeView
   voted: boolean
   signedIn: boolean
   variant?: 'card' | 'page'
 }) {
+  const router = useRouter()
   const [voted, setVoted] = useState(initialVoted)
+  const [serverCount, setServerCount] = useState<number | null>(null)
+  const [, startTransition] = useTransition()
 
-  const shown = count + (voted === initialVoted ? 0 : voted ? 1 : -1)
+  /**
+   * Номер последнего отправленного запроса.
+   *
+   * Кнопку жмут быстрее, чем отвечает сервер, и ответы возвращаются
+   * в произвольном порядке. Без этого счётчика поздний ответ на ранний
+   * клик затирает результат позднего, и после чётного числа нажатий
+   * на экране остаётся нечётное состояние.
+   */
+  const attempt = useRef(0)
+
+  /* Пока сервер не ответил, счётчик показывается предположительно; после
+     ответа — то, что реально в базе. Расхождение возможно и нормально:
+     за секунду между кликами кто-то ещё мог проголосовать. */
+  const shown =
+    serverCount ?? count + (voted === initialVoted ? 0 : voted ? 1 : -1)
   const wide = variant === 'page'
+
+  const submit = () => {
+    const next = !voted
+    const mine = ++attempt.current
+    setVoted(next)
+    setServerCount(null)
+
+    startTransition(async () => {
+      const result = await voteAction(postId)
+      /* Пришёл ответ на устаревший клик — он уже ничего не значит. */
+      if (mine !== attempt.current) return
+
+      if (result.ok) {
+        setVoted(result.voted)
+        setServerCount(result.count)
+        return
+      }
+      /* Откатываем: голос не учтён, и показывать обратное нечестно. */
+      setVoted(!next)
+      if (result.reason === 'unauthorized') router.push('/login')
+    })
+  }
 
   const shell =
     'flex shrink-0 flex-col items-center justify-center rounded-card border text-center transition-colors ' +
@@ -72,7 +116,7 @@ export function VoteControl({
   return (
     <button
       type="button"
-      onClick={() => setVoted((v) => !v)}
+      onClick={submit}
       aria-pressed={voted}
       aria-label={`${type.voteLabel}. Сейчас ${label}`}
       className={

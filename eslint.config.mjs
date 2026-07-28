@@ -8,6 +8,9 @@ const config = [
       'node_modules/**',
       'design system/**',
       'next-env.d.ts',
+      /* Клиент Prisma генерируется из схемы: править его бессмысленно,
+         а замечания линтера к нему — шум на несколько тысяч строк. */
+      'src/generated/**',
     ],
   },
   ...coreWebVitals,
@@ -23,7 +26,7 @@ const config = [
         {
           patterns: [
             {
-              group: ['@/queries/mock/*', '@/queries/db/*'],
+              group: ['@/queries/db/*'],
               message:
                 'UI и features импортируют контракт @/queries, а не его реализацию.',
             },
