@@ -22,7 +22,8 @@
     "db:studio": "prisma studio",
     "db:reset": "node scripts/pg.mjs reset && prisma migrate deploy && tsx prisma/seed.ts",
     "db:verify": "tsx scripts/verify-schema.ts",
-    "worker": "tsx scripts/worker.ts"
+    "worker": "tsx scripts/worker.ts",
+    "db:bench": "tsx scripts/bench.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
