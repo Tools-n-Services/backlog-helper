@@ -15,8 +15,10 @@
 import { product } from '@config/product'
 import { statuses, statusByKey } from '@config/statuses'
 import { postTypes, postTypeByKey } from '@config/post-types'
+import { backlogKinds, backlogKindName, internalStatuses, internalStatusByKey } from '@config/internal-statuses'
 import { severities } from '@config/scoring'
 import type { Privacy } from '@config/post-types'
+import type { BacklogKind } from '@/generated/prisma/enums'
 import { prisma } from '@/core/db'
 import { autoPriority } from '@/core/domain/triage/priority'
 import { slaState } from '@/core/domain/triage/sla'
@@ -35,6 +37,11 @@ import type {
   CommentView,
   FacetView,
   FeedQuery,
+  BacklogItemDetailView,
+  BacklogItemView,
+  BacklogLinkView,
+  BacklogQuery,
+  BacklogView,
   FeedResult,
   ModerationItemView,
   PersonView,
@@ -789,6 +796,149 @@ export const dbQueries: QueryPort = {
     }))
   },
 
+/* ─────────────────────────── Бэклог ──────────────────────────── */
+
+  /**
+   * Список работ (FR-601, FR-616).
+   *
+   * Порядок — ручной ранг, а не расчётный скор: продуктовые решения принимают
+   * люди, и расчёт остаётся подсказкой (FR-615). Завершённое по умолчанию
+   * скрыто — бэклог отвечает на вопрос «что дальше», а не «что было».
+   */
+  async getBacklog(query: BacklogQuery): Promise<BacklogView> {
+    const now = new Date()
+    const search = query.search.trim()
+
+    const where = {
+      ...(query.includeDone ? {} : { internalStatus: { isTerminal: false } }),
+      ...(query.statusKeys.length
+        ? { internalStatus: { key: { in: query.statusKeys } } }
+        : {}),
+      ...(query.themeSlugs.length ? { theme: { slug: { in: query.themeSlugs } } } : {}),
+      ...(query.kinds.length ? { kind: { in: query.kinds as BacklogKind[] } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' as const } },
+              { problem: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    }
+
+    const [rows, total, themes, allItems] = await Promise.all([
+      prisma.backlogItem.findMany({ where, orderBy: { rank: 'asc' }, select: backlogSelect }),
+      prisma.backlogItem.count({ where }),
+      prisma.theme.findMany({
+        orderBy: { name: 'asc' },
+        select: { slug: true, name: true, _count: { select: { items: true } } },
+      }),
+      /* Счётчики фильтров — по всем активным работам, а не по текущей выборке:
+         иначе выбор статуса обнуляет остальные и панель бесполезна. */
+      prisma.backlogItem.findMany({
+        where: query.includeDone ? {} : { internalStatus: { isTerminal: false } },
+        select: { kind: true, internalStatus: { select: { key: true } } },
+      }),
+    ])
+
+    const countBy = <T>(pick: (i: (typeof allItems)[number]) => T | null) => {
+      const map = new Map<T, number>()
+      for (const item of allItems) {
+        const key = pick(item)
+        if (key !== null) map.set(key, (map.get(key) ?? 0) + 1)
+      }
+      return map
+    }
+    const statusCounts = countBy((i) => i.internalStatus?.key ?? null)
+    const kindCounts = countBy((i) => i.kind)
+
+    return {
+      items: rows.map((r) => toBacklogItemView(r, now)),
+      total,
+      themes: themes.map((t) => ({ slug: t.slug, name: t.name, count: t._count.items })),
+      statuses: internalStatuses
+        .map((s) => ({ key: s.key, name: s.name, count: statusCounts.get(s.key) ?? 0 }))
+        .filter((f) => f.count > 0),
+      kinds: backlogKinds
+        .map((k) => ({ key: k.key, name: k.name, count: kindCounts.get(k.key) ?? 0 }))
+        .filter((f) => f.count > 0),
+    }
+  },
+
+  async getBacklogItem(id: string): Promise<BacklogItemDetailView | null> {
+    if (!isUuid(id)) return null
+
+    const row = await prisma.backlogItem.findUnique({
+      where: { id },
+      select: {
+        ...backlogSelect,
+        parent: { select: { id: true, title: true } },
+        children: { orderBy: { rank: 'asc' }, select: backlogSelect },
+        posts: {
+          select: {
+            post: {
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+                voteCount: true,
+                board: { select: { slug: true, name: true } },
+                status: { select: { key: true } },
+                type: { select: { key: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!row) return null
+
+    const now = new Date()
+    return {
+      ...toBacklogItemView(row, now),
+      parent: row.parent,
+      children: row.children.map((c) => toBacklogItemView(c, now)),
+      posts: row.posts
+        .map(({ post }) => ({
+          id: post.id,
+          slug: post.slug,
+          boardSlug: post.board.slug,
+          boardName: post.board.name,
+          title: post.title,
+          status: toStatusView(post.status.key),
+          count: post.voteCount,
+          countLabel: countLabelOf(post.type.key),
+        }))
+        /* Самое востребованное сверху: по нему и решают, браться ли. */
+        .sort((a, b) => b.count - a.count),
+    }
+  },
+
+  async getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]> {
+    if (!isUuid(postId)) return []
+
+    const rows = await prisma.backlogPost.findMany({
+      where: { postId },
+      select: {
+        backlogItem: {
+          select: {
+            id: true,
+            title: true,
+            kind: true,
+            internalStatus: { select: { name: true } },
+          },
+        },
+      },
+    })
+
+    return rows.map(({ backlogItem }) => ({
+      id: backlogItem.id,
+      title: backlogItem.title,
+      kindName: backlogKindName(backlogItem.kind),
+      statusName: backlogItem.internalStatus?.name ?? null,
+    }))
+  },
+
   async getTriageQueue(query: TriageQuery): Promise<TriageQueueView> {
     const now = new Date()
 
@@ -894,6 +1044,64 @@ export const dbQueries: QueryPort = {
 /* ─────────────────────────── Вспомогательное ──────────────────────────── */
 
 const ROADMAP_COLUMN_LIMIT = 3
+
+/* ─────────────────────────── Бэклог ──────────────────────────── */
+
+const backlogSelect = {
+  id: true,
+  title: true,
+  problem: true,
+  kind: true,
+  estimate: true,
+  targetRelease: true,
+  rank: true,
+  createdAt: true,
+  updatedAt: true,
+  theme: { select: { slug: true, name: true } },
+  internalStatus: { select: { key: true } },
+  owner: { select: { name: true } },
+  /* Голоса связанных обращений — грубая оценка спроса. Настоящий охват
+     с дедупликацией по человеку считает джоба (FR-612), и он появится
+     отдельным полем: сумма голосов завышает ровно на тех, кто голосовал
+     за несколько связанных обращений. */
+  posts: { select: { post: { select: { voteCount: true } } } },
+} as const
+
+type BacklogRow = {
+  id: string
+  title: string
+  problem: string
+  kind: string
+  estimate: string | null
+  targetRelease: string | null
+  createdAt: Date
+  updatedAt: Date | null
+  theme: { slug: string; name: string } | null
+  internalStatus: { key: string } | null
+  owner: { name: string } | null
+  posts: { post: { voteCount: number } }[]
+}
+
+function toBacklogItemView(row: BacklogRow, now: Date): BacklogItemView {
+  const status = row.internalStatus ? internalStatusByKey.get(row.internalStatus.key) : null
+  return {
+    id: row.id,
+    title: row.title,
+    problem: row.problem,
+    kind: row.kind,
+    kindName: backlogKindName(row.kind),
+    themeName: row.theme?.name ?? null,
+    themeSlug: row.theme?.slug ?? null,
+    statusKey: row.internalStatus?.key ?? null,
+    statusName: status?.name ?? row.internalStatus?.key ?? null,
+    ownerName: row.owner?.name ?? null,
+    estimate: row.estimate,
+    targetRelease: row.targetRelease,
+    postCount: row.posts.length,
+    voteCount: row.posts.reduce((sum, p) => sum + p.post.voteCount, 0),
+    updatedLabel: relativeLabel(row.updatedAt ?? row.createdAt, now),
+  }
+}
 
 const CHANGE_KIND_NAMES: Record<ChangeKind, string> = {
   new: 'Новое',

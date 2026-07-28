@@ -312,6 +312,95 @@ export interface ProfileView {
   stats: { authored: number; voted: number; inProgress: number }
 }
 
+/* ─────────────────────────── Бэклог ──────────────────────────── */
+
+/**
+ * Элемент бэклога — единица РАБОТЫ, а не обращение (06-backlog.md, раздел 0).
+ *
+ * Разделение центральное для продукта: одну работу питают несколько обращений,
+ * внутренняя формулировка отличается от публичной, а техдолг конкурирует
+ * за приоритет наравне, не имея ни одного обращения вовсе.
+ */
+export interface BacklogItemView {
+  id: string
+  title: string
+  /** Формулировка проблемы, а не решения. */
+  problem: string
+  kind: string
+  kindName: string
+  themeName: string | null
+  themeSlug: string | null
+  /** Внутренний статус. Публичного соответствия может не быть. */
+  statusKey: string | null
+  statusName: string | null
+  ownerName: string | null
+  estimate: string | null
+  targetRelease: string | null
+  /** Сколько обращений питают эту работу. */
+  postCount: number
+  /** Суммарные голоса связанных обращений — грубая оценка спроса. */
+  voteCount: number
+  updatedLabel: string
+}
+
+/** Связанное обращение в карточке элемента. */
+export interface BacklogPostLink {
+  id: string
+  slug: string
+  boardSlug: string
+  boardName: string
+  title: string
+  status: StatusView
+  count: number
+  countLabel: [string, string, string]
+}
+
+export interface BacklogItemDetailView extends BacklogItemView {
+  /** Обращения, которые закроет эта работа (FR-602). */
+  posts: BacklogPostLink[]
+  /** Фазы: дочерние элементы (FR-608). */
+  children: BacklogItemView[]
+  parent: { id: string; title: string } | null
+}
+
+/**
+ * Работа, в которую попало обращение, — для страницы обращения.
+ *
+ * Внутренние формулировки наружу не идут: строку видит только команда,
+ * и вопрос она закрывает ровно один — «этим кто-нибудь занимается?».
+ */
+export interface BacklogLinkView {
+  id: string
+  title: string
+  kindName: string
+  statusName: string | null
+}
+
+export interface BacklogColumnView {
+  statusKey: string
+  statusName: string
+  hint: string
+  items: BacklogItemView[]
+}
+
+export interface BacklogQuery {
+  /** Ключ внутреннего статуса; пусто — все активные. */
+  statusKeys: string[]
+  themeSlugs: string[]
+  kinds: string[]
+  search: string
+  /** Показывать завершённые: по умолчанию бэклог про предстоящее. */
+  includeDone: boolean
+}
+
+export interface BacklogView {
+  items: BacklogItemView[]
+  total: number
+  themes: { slug: string; name: string; count: number }[]
+  statuses: FacetView[]
+  kinds: FacetView[]
+}
+
 /* ────────────────────────── Модерация ────────────────────────── */
 
 /**
@@ -426,4 +515,9 @@ export interface QueryPort {
   getTriageQueue(query: TriageQuery): Promise<TriageQueueView>
   /** Обращения, ждущие проверки модератором (FR-201). */
   getModerationQueue(): Promise<ModerationItemView[]>
+  /** Бэклог: единицы работы, а не обращения (FR-601). */
+  getBacklog(query: BacklogQuery): Promise<BacklogView>
+  getBacklogItem(id: string): Promise<BacklogItemDetailView | null>
+  /** В какие работы попало обращение. Видно только команде. */
+  getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]>
 }

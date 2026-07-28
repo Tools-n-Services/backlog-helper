@@ -25,6 +25,7 @@ import { existsSync } from 'node:fs'
 import { product } from '@config/product'
 import { statuses as statusConfig } from '@config/statuses'
 import { postTypes } from '@config/post-types'
+import { internalStatuses } from '@config/internal-statuses'
 import { slaPolicies, segmentWeights } from '@config/scoring'
 import {
   categories as categoryFixtures,
@@ -623,6 +624,179 @@ async function seedMergedDuplicates(ids: Ids, expanded: ExpandedPost[], postIds:
   return total
 }
 
+/**
+ * Внутренние статусы и их отображение на публичные (FR-631, FR-632).
+ *
+ * `status_map` заполняется только там, где у внутреннего этапа есть публичное
+ * соответствие. Пустая связь — это не пропуск, а сообщение: переход
+ * пользователю не виден и писем не рассылает.
+ */
+async function seedInternalStatuses(statusIds: Map<string, string>) {
+  await prisma.internalStatus.createMany({
+    data: internalStatuses.map((s) => ({
+      key: s.key,
+      name: s.name,
+      position: s.position,
+      isTerminal: s.isTerminal,
+    })),
+  })
+  const rows = await prisma.internalStatus.findMany()
+  const byKey = new Map(rows.map((r) => [r.key, r.id]))
+
+  const mappings = internalStatuses.flatMap((s) => {
+    if (!s.publicStatusKey) return []
+    const internalStatusId = byKey.get(s.key)
+    const statusId = statusIds.get(s.publicStatusKey)
+    return internalStatusId && statusId ? [{ internalStatusId, statusId }] : []
+  })
+  await prisma.statusMap.createMany({ data: mappings })
+
+  return byKey
+}
+
+/**
+ * Демонстрационный бэклог.
+ *
+ * Показывает то, ради чего элемент отделён от обращения: одна работа
+ * закрывает несколько обращений, внутренняя формулировка отличается
+ * от публичной, а техдолг живёт в той же очереди без единого обращения.
+ */
+async function seedBacklog(
+  ids: Ids,
+  expanded: ExpandedPost[],
+  postIds: Map<string, string>,
+  internalIds: Map<string, string>,
+) {
+  const themes = await Promise.all(
+    [
+      { slug: 'planning', name: 'Планирование смен', description: 'Всё, что про построение графика' },
+      { slug: 'reports', name: 'Отчётность', description: 'Выгрузки, сводки, интеграции с учётом' },
+      { slug: 'platform', name: 'Платформа', description: 'Надёжность, скорость, техдолг' },
+    ].map((t) => prisma.theme.create({ data: t })),
+  )
+  const themeBySlug = new Map(themes.map((t) => [t.slug, t.id]))
+
+  const idOf = (title: string) => {
+    const post = expanded.find((p) => p.seed.title === title)
+    return post ? postIds.get(post.id) : undefined
+  }
+
+  const items: {
+    title: string
+    problem: string
+    kind: 'feature' | 'bug' | 'tech' | 'compliance'
+    theme: string
+    status: string
+    posts: string[]
+    estimate?: string
+    targetRelease?: string
+  }[] = [
+    {
+      /* Внутренняя формулировка отличается от публичной намеренно: в бэклоге
+         стоит фаза работы, у пользователя — его просьба. */
+      title: 'Массовое копирование расписания, фаза 1: период и праздники',
+      problem:
+        'Управляющий тратит день в месяц на перенос одного и того же шаблона по неделям, и ошибается неделей.',
+      kind: 'feature',
+      theme: 'planning',
+      status: 'in-progress',
+      estimate: '3 недели',
+      targetRelease: 'релиз 2.32',
+      /* Три обращения — одна работа. Ровно тот случай, ради которого
+         связь N:M и заведена. */
+      posts: [
+        'Массовое копирование недели на месяц вперёд',
+        'Учёт производственного календаря при копировании',
+        'Копирование недели дублирует отпуска',
+      ],
+    },
+    {
+      title: 'Разбивка часов по видам при выгрузке',
+      problem:
+        'Бухгалтерия считает надбавки за ночные и праздничные руками, потому что в выгрузке только общий итог.',
+      kind: 'feature',
+      theme: 'reports',
+      status: 'ready',
+      estimate: '2 недели',
+      posts: [
+        'Сводка по часам с разбивкой на дневные, ночные и праздничные',
+        'Итог по часам в файле не сходится с итогом на экране',
+      ],
+    },
+    {
+      title: 'Разбор смены через полночь в едином месте',
+      problem:
+        'Правило разбивки смены по датам продублировано в трёх выгрузках, и расходятся они по-разному.',
+      kind: 'bug',
+      theme: 'reports',
+      status: 'review',
+      targetRelease: 'релиз 2.31',
+      posts: [
+        'Экспорт графика в Excel теряет ночные смены',
+        'Ночная смена отображается в неправильном дне недели',
+      ],
+    },
+    {
+      title: 'Промежуточная роль между сотрудником и управляющим',
+      problem:
+        'Нет уровня прав, позволяющего двигать людей внутри своего дня, но не трогать месяц.',
+      kind: 'feature',
+      theme: 'planning',
+      status: 'discovery',
+      posts: ['Роль «старший смены» с правом двигать только свой день'],
+    },
+    {
+      /* Техдолг без единого связанного обращения: он обязан выглядеть
+         нормальным жителем бэклога, а не ошибкой (FR-605). */
+      title: 'Переезд очереди синхронизации на идемпотентные операции',
+      problem:
+        'Повторная доставка события создаёт дубль смены. Лечим точечно уже третий раз.',
+      kind: 'tech',
+      theme: 'platform',
+      status: 'inbox',
+      estimate: '4 недели',
+      posts: [],
+    },
+    {
+      title: 'Хранение диагностики не дольше срока retention',
+      problem:
+        'Диагностика из виджета содержит персональные данные и сейчас лежит бессрочно.',
+      kind: 'compliance',
+      theme: 'platform',
+      status: 'inbox',
+      posts: [],
+    },
+  ]
+
+  let rank = 1000
+  for (const item of items) {
+    const created = await prisma.backlogItem.create({
+      data: {
+        title: item.title,
+        problem: item.problem,
+        kind: item.kind,
+        themeId: themeBySlug.get(item.theme) ?? null,
+        internalStatusId: internalIds.get(item.status) ?? null,
+        ownerId: ids.users.team[0] ?? null,
+        estimate: item.estimate ?? null,
+        targetRelease: item.targetRelease ?? null,
+        /* Дробная индексация: шаг в тысячу оставляет место между соседями
+           для перетаскивания без пересчёта всей таблицы. */
+        rank,
+      },
+    })
+    rank += 1000
+
+    const links = item.posts.flatMap((title) => {
+      const postId = idOf(title)
+      return postId ? [{ backlogItemId: created.id, postId }] : []
+    })
+    if (links.length) await prisma.backlogPost.createMany({ data: links })
+  }
+
+  return items.length
+}
+
 async function seedChangelog(postIds: Map<string, string>, expanded: ExpandedPost[]) {
   for (const entry of changelogSeeds) {
     const publishedAt = at(entry.agoDays)
@@ -726,6 +900,10 @@ async function main() {
   console.log('Объединённые дубликаты…')
   const merged = await seedMergedDuplicates(ids, expanded, postIds)
 
+  console.log('Бэклог…')
+  const internalIds = await seedInternalStatuses(statusIds)
+  const backlogItems = await seedBacklog(ids, expanded, postIds, internalIds)
+
   console.log('Changelog…')
   const releases = await seedChangelog(postIds, expanded)
 
@@ -753,7 +931,7 @@ async function main() {
   console.log(
     `\nГотово за ${seconds} с: ${expanded.length} обращений, ${merged} объединённых, ` +
       `${votes} голосов, ${comments} комментариев, ${changes} смен статуса, ` +
-      `${releases} релизов, ${subs} подписок.`,
+      `${releases} релизов, ${subs} подписок, ${backlogItems} элементов бэклога.`,
   )
 
   /* Пароля нет, вход только по ссылке из письма — значит адрес и есть

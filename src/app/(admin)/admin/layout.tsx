@@ -56,6 +56,9 @@ export default async function AdminLayout({
             <AdminTab href="/admin/moderation" contour="intake">
               Модерация
             </AdminTab>
+            <AdminTab href="/admin/backlog" contour="backlog">
+              Бэклог
+            </AdminTab>
             <AdminTab href="/admin/people" contour="backlog">
               Люди
             </AdminTab>
@@ -80,7 +83,7 @@ function AdminTab({
   contour,
   children,
 }: {
-  href: '/admin/triage' | '/admin/moderation' | '/admin/people'
+  href: '/admin/triage' | '/admin/moderation' | '/admin/backlog' | '/admin/people'
   contour: 'intake' | 'triage' | 'backlog'
   children: React.ReactNode
 }) {

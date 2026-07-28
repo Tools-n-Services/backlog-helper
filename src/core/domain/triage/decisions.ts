@@ -6,6 +6,7 @@
  * построчно, и код ниже следует им буквально, а не «в целом».
  */
 
+import { createFromPost } from '@/core/domain/backlog/mutations'
 import { prisma } from '@/core/db'
 import { decisionByKey } from './decision-specs'
 
@@ -84,6 +85,20 @@ export async function applyDecision(
       },
     }),
   ])
+
+  /* «В бэклог» заводит единицу работы (FR-603) — иначе решение остаётся
+     сменой статуса и обещанием, за которым в бэклоге ничего нет.
+     Вне транзакции: смена статуса уже свершилась и откатывать её из-за
+     не заведённой карточки нельзя — карточку заведут руками. */
+  if (decision.createsBacklogItem) {
+    const linked = await prisma.backlogPost.findFirst({
+      where: { postId },
+      select: { backlogItemId: true },
+    })
+    /* Повторное решение по тому же обращению не плодит копии работы:
+       оператор жмёт «в бэклог» дважды чаще, чем кажется. */
+    if (!linked) await createFromPost(postId, actorId)
+  }
 
   return { ok: true }
 }

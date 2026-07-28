@@ -22,6 +22,8 @@ export interface DecisionSpec {
   needsReason: boolean
   /** Обращение начинает ждать ответа автора (FR-533). */
   awaitsReporter?: boolean
+  /** Заводит элемент бэклога из обращения, если его ещё нет (FR-603). */
+  createsBacklogItem?: boolean
 }
 
 export const DECISIONS: DecisionSpec[] = [
@@ -74,6 +76,7 @@ export const DECISIONS: DecisionSpec[] = [
     statusKey: 'planned',
     resolution: null,
     needsReason: false,
+    createsBacklogItem: true,
   },
 ]
 
