@@ -18,6 +18,7 @@ import { portalOrigin } from '@/core/domain/post/notifications'
 import {
   MAIL_DIR,
   mailProvider,
+  parseSender,
   readSmtpConfig,
   resetSmtpTransport,
   send,
@@ -33,21 +34,56 @@ function check(ok: boolean, message: string) {
   console.log(`${ok ? '✓' : '✗'} ${message}`)
 }
 
-const KNOWN = ['smtp', 'resend', 'file', 'log']
+const KNOWN = ['smtp', 'unisender', 'resend', 'file', 'log']
 
 function checkProvider() {
   const provider = mailProvider()
+  const sender = parseSender()
   console.log(`Канал: ${provider}`)
-  console.log(`Отправитель: ${senderAddress()}\n`)
+  console.log(
+    `Отправитель: ${senderAddress()}` +
+      /* Разбор показывается, потому что именно он уходит в HTTP-API
+         раздельными полями — и ошибка в форме адреса видна здесь. */
+      (provider === 'unisender'
+        ? ` (адрес ${sender.email}, имя ${sender.name ?? 'не задано'})`
+        : ''),
+  )
+  console.log()
   check(KNOWN.includes(provider), `MAIL_PROVIDER — одно из ${KNOWN.join(', ')}`)
 
   if (provider === 'smtp') return checkSmtp()
+  if (provider === 'unisender') return checkUnisender()
   if (provider === 'resend') {
     check(Boolean(process.env.RESEND_API_KEY), 'RESEND_API_KEY задан')
     return
   }
   if (provider === 'file') {
     console.log(`  письма складываются в ${MAIL_DIR}, в реальные ящики не идут`)
+  }
+}
+
+function checkUnisender() {
+  check(Boolean(process.env.UNISENDER_API_KEY), 'UNISENDER_API_KEY задан')
+
+  const url = process.env.UNISENDER_API_URL?.trim()
+  console.log(`  ${url || 'go1.unisender.ru (российская площадка)'}`)
+
+  const sender = parseSender()
+  /* Домен отправителя сервис обязан знать: письмо с чужого домена он
+     отвергает, и это самая частая причина отказа на старте. */
+  const domain = sender.email.split('@')[1]
+  if (domain) {
+    console.log(
+      `  домен ${domain} должен быть подтверждён в панели Unisender — ` +
+        'иначе письма отвергаются',
+    )
+  }
+
+  if (!process.env.UNISENDER_SKIP_UNSUBSCRIBE) {
+    console.log(
+      '  сервис допишет свою ссылку отписки; отключается ' +
+        'UNISENDER_SKIP_UNSUBSCRIBE=1 после разрешения поддержки',
+    )
   }
 }
 

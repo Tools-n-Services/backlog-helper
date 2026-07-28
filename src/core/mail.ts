@@ -5,18 +5,23 @@
  * что его обращение взяли в работу, и не вернётся. Поэтому канал доставки —
  * не деталь инфраструктуры, а часть продукта.
  *
- * Четыре канала, и каждый решает свою задачу:
+ * Пять каналов, и каждый решает свою задачу:
  *
- *   smtp   — настоящая доставка через сервер организации. Основной путь:
- *            SMTP есть у Яндекс 360, Mail.ru для бизнеса, корпоративного
- *            Exchange, а также у SES и Mailgun, то есть выбор поставщика
- *            не требует правок кода;
- *   resend — настоящая доставка через HTTP-API, когда SMTP закрыт наружу;
- *   file   — локальный ящик в `.data/mail`. Полноценный канал, а не пропуск
- *            отправки: без него вход по ссылке нельзя ни попробовать
- *            на свежем клоне, ни проверить сценарным тестом, потому что
- *            ссылка приходит только письмом;
- *   log    — то же самое в консоль, когда файлы не нужны.
+ *   smtp      — настоящая доставка через сервер организации. Основной путь:
+ *               SMTP есть у Яндекс 360, Mail.ru для бизнеса, корпоративного
+ *               Exchange, а также у SES и Mailgun, то есть выбор поставщика
+ *               не требует правок кода;
+ *   unisender — Unisender Go: российский сервис рассылки. Оплата в рублях
+ *               и репутация отправителя, известная Яндексу и Mail.ru;
+ *   resend    — доставка через HTTP-API, когда SMTP закрыт наружу;
+ *   file      — локальный ящик в `.data/mail`. Полноценный канал, а не пропуск
+ *               отправки: без него вход по ссылке нельзя ни попробовать
+ *               на свежем клоне, ни проверить сценарным тестом, потому что
+ *               ссылка приходит только письмом;
+ *   log       — то же самое в консоль, когда файлы не нужны.
+ *
+ * Разница между SMTP и HTTP-API не в надёжности, а в том, что закрыто
+ * в сети развёртывания: порт 587 наружу закрывают чаще, чем 443.
  *
  * Выбор — переменной `MAIL_PROVIDER`. Умолчание `file`: на машине
  * разработчика ключей от почтового сервиса нет, и молча не отправить
@@ -36,7 +41,7 @@ export interface Letter {
   text: string
 }
 
-export type MailProvider = 'smtp' | 'resend' | 'file' | 'log'
+export type MailProvider = 'smtp' | 'unisender' | 'resend' | 'file' | 'log'
 
 /**
  * Настройки читаются при отправке, а не при импорте модуля.
@@ -86,6 +91,8 @@ export async function send(letter: Letter): Promise<SendResult> {
     switch (provider) {
       case 'smtp':
         return await sendViaSmtp(letter)
+      case 'unisender':
+        return await sendViaUnisender(letter)
       case 'resend':
         return await sendViaResend(letter)
       case 'log':
@@ -203,6 +210,130 @@ async function sendViaSmtp(letter: Letter): Promise<SendResult> {
     return { ok: false, error: `Сервер отверг адрес: ${info.rejected.join(', ')}` }
   }
   return { ok: true }
+}
+
+/* ────────────────────────── Unisender Go ─────────────────────────── */
+
+/**
+ * Российский сервис рассылки транзакционных писем.
+ *
+ * Отличается от Resend не возможностями, а тем, что для портала с русскими
+ * пользователями решает исход: оплата в рублях без зарубежной карты
+ * и репутация отправителя, которую Яндекс и Mail.ru знают.
+ *
+ * Адрес вынесен в переменную не для тестов, а потому что у сервиса две
+ * площадки — российская и европейская, и выбор между ними это вопрос того,
+ * где по договору лежат персональные данные, а не настройка кода.
+ */
+const UNISENDER_URL = 'https://go1.unisender.ru/ru/transactional/api/v1/email/send.json'
+
+export interface Sender {
+  email: string
+  name: string | null
+}
+
+/**
+ * Разбор адреса отправителя на имя и почту.
+ *
+ * SMTP и Resend принимают `Имя <адрес>` как есть, а Unisender Go требует
+ * два поля раздельно. Разбор здесь, а не две переменные окружения на то же
+ * самое: одна настройка, которая работает для всех каналов, честнее двух,
+ * которые обязаны совпадать.
+ */
+export function parseSender(address: string = senderAddress()): Sender {
+  const match = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(address)
+  if (!match) return { email: address.trim(), name: null }
+
+  return {
+    email: match[2]!.trim(),
+    /* Имя в кавычках — допустимая форма заголовка, кавычки в поле не нужны. */
+    name: match[1]!.replace(/^"|"$/g, '').trim() || null,
+  }
+}
+
+interface UnisenderResponse {
+  status?: string
+  code?: number
+  message?: string
+  /** Адреса, которые сервис не принял: причина по каждому. */
+  failed_emails?: Record<string, string>
+}
+
+async function sendViaUnisender(letter: Letter): Promise<SendResult> {
+  const key = process.env.UNISENDER_API_KEY
+  if (!key) {
+    return { ok: false, error: 'MAIL_PROVIDER=unisender, но UNISENDER_API_KEY не задан' }
+  }
+  /* Ключ уходит HTTP-заголовком, а заголовки допускают только latin1.
+     Проверка не теоретическая: на русской раскладке «с» и «c», «е» и «e»
+     неотличимы на глаз, и одна такая буква в ключе даёт ошибку про
+     ByteString и код 255 — по ней причину не угадать никогда. */
+  if (!/^[\x20-\x7E]+$/.test(key)) {
+    return {
+      ok: false,
+      error: 'UNISENDER_API_KEY содержит символы вне latin1 — вероятно, кириллица в ключе',
+    }
+  }
+
+  const url = process.env.UNISENDER_API_URL?.trim() || UNISENDER_URL
+  const sender = parseSender()
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        recipients: [{ email: letter.to }],
+        subject: letter.subject,
+        body: { plaintext: letter.text },
+        from_email: sender.email,
+        ...(sender.name ? { from_name: sender.name } : {}),
+        /* Сервис по умолчанию дописывает свою ссылку отписки. Портал ставит
+           свою — там, где она уместна, и не ставит в письме со ссылкой входа,
+           от которого отписаться нельзя по смыслу. Отключение требует
+           разрешения поддержки сервиса, поэтому это выбор владельца портала,
+           а не наше умолчание. */
+        ...(isTrue(process.env.UNISENDER_SKIP_UNSUBSCRIBE) ? { skip_unsubscribe: 1 } : {}),
+      },
+    }),
+  })
+
+  const body = (await response.json().catch(() => null)) as UnisenderResponse | null
+
+  if (!response.ok) {
+    /* Сообщение сервиса важнее кода ответа: «превышен лимит» и «домен
+       не подтверждён» приходят одним и тем же 400. */
+    const detail = body?.message ?? (await response.text().catch(() => ''))
+    return {
+      ok: false,
+      error: `Unisender ответил ${response.status}${detail ? `: ${detail}` : ''}`,
+    }
+  }
+
+  if (body?.status && body.status !== 'success') {
+    return {
+      ok: false,
+      error: `Unisender: ${body.message ?? body.status}${body.code ? ` (код ${body.code})` : ''}`,
+    }
+  }
+
+  /* Приём запроса и приём адреса — разные вещи. Ответ 200 с непустым
+     failed_emails означает, что письмо не ушло, и считать это успехом
+     значит потерять его молча: повтора не будет. */
+  const failed = Object.entries(body?.failed_emails ?? {})
+  if (failed.length > 0) {
+    return {
+      ok: false,
+      error: `Unisender отверг адрес: ${failed.map(([to, why]) => `${to} — ${why}`).join('; ')}`,
+    }
+  }
+
+  return { ok: true }
+}
+
+function isTrue(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true'
 }
 
 async function sendViaResend(letter: Letter): Promise<SendResult> {
