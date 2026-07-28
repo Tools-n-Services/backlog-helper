@@ -1,0 +1,523 @@
+<!doctype html>
+<!--
+  English version of the backlog-helper landing page.
+
+  Structure mirrors ../index.html (ru) and ../es/index.html one-to-one — keep the
+  three files in the same order of sections so a copy edit can be mirrored.
+  Styles and the copy-to-clipboard script are shared: ../styles.css, ../copy.js.
+
+  Before publishing: set canonical/og:url to the real domain, add og:image,
+  and state the licence in the footer once the repo has a LICENSE file.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The header mark, inlined: the landing needs no separate binary file. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%230a0a0a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'>b</text></svg>"
+    />
+    <title>backlog-helper — open-source feedback, bug and backlog portal</title>
+    <meta
+      name="description"
+      content="Open-source feedback portal: feature requests, bug reports, triage, backlog, roadmap and changelog. Clone the repository and run it yourself."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="backlog-helper — open-source feedback and backlog portal" />
+    <meta
+      property="og:description"
+      content="Requests, bug reports, triage, backlog, roadmap and changelog in one data model. Open source, self-hosted, one clone per product."
+    />
+    <meta property="og:locale" content="en_US" />
+    <link rel="alternate" hreflang="ru" href="../index.html" />
+    <link rel="alternate" hreflang="en" href="index.html" />
+    <link rel="alternate" hreflang="es" href="../es/index.html" />
+    <link rel="alternate" hreflang="x-default" href="../index.html" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <div class="banner">
+      <div class="page banner__inner">
+        <span class="banner__tag">work in progress</span>
+        <span
+          >The public portal and the triage queue are already clickable; the next
+          iteration replaces fixtures with Postgres.</span
+        >
+        <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
+          >Development plan →</a
+        >
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="page header__inner">
+        <a class="brand" href="#main" aria-label="backlog-helper, back to top">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+
+        <nav class="header__nav" aria-label="Page sections">
+          <a href="#screens">Screens</a>
+          <a href="#features">Features</a>
+          <a href="#start">Get started</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs">Docs</a>
+        </nav>
+
+        <div class="header__right">
+          <nav class="lang" aria-label="Page language">
+            <a href="../index.html" hreflang="ru">ru</a>
+            <a href="index.html" hreflang="en" aria-current="page">en</a>
+            <a href="../es/index.html" hreflang="es">es</a>
+          </nav>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/Tools-n-Services/backlog-helper"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ── Hero ──────────────────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="page">
+          <h1>Backlog as a <b>service</b></h1>
+          <p class="lead">
+            An open-source feedback portal: feature requests and bug reports, triage,
+            backlog, roadmap and changelog. Clone the repository — the service is yours.
+          </p>
+
+          <div class="cmd">
+            <code id="clone-cmd"
+              ><span class="p">$</span> git clone
+              https://github.com/Tools-n-Services/backlog-helper</code
+            >
+            <button
+              type="button"
+              id="copy-btn"
+              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copied="Command copied"
+              data-copy-failed="Copy failed — select the command manually"
+            >
+              copy
+            </button>
+          </div>
+          <p aria-live="polite" id="copy-status" class="cmd__status"></p>
+
+          <div class="hero__actions">
+            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Get the repository</a
+            >
+            <a
+              class="btn btn--ghost"
+              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+              >Product overview</a
+            >
+          </div>
+
+          <p class="hero__stack">Next.js · PostgreSQL · self-hosted · one clone per product</p>
+
+          <div class="shot shot--raised hero__shot">
+            <img
+              src="../assets/feed.png"
+              width="2880"
+              height="1800"
+              alt="Board feed: requests with vote counts, filters by status, type and category, sorting by trending, top and newest."
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Three loops ───────────────────────────────────────────────── -->
+      <section id="how">
+        <div class="page">
+          <p class="label">How it works</p>
+          <h2>Intake, triage and backlog — <b>in one data model</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Normally these are three separate systems and the link between them is lost:
+            users never learn what happened to their request, and the team prioritises
+            blind.
+          </p>
+
+          <div class="contours">
+            <article class="contour">
+              <span class="contour__n">01 — intake</span>
+              <h3>Typed submissions</h3>
+              <p>
+                The type drives the form, the statuses and the visibility: an idea has one
+                set of fields, a bug adds steps, frequency, severity and environment.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">02 — triage</span>
+              <h3>A decision on every item</h3>
+              <p>
+                Confirm, ask for details, merge, decline. Every decision carries a reason,
+                and the reason goes out by email.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">03 — backlog</span>
+              <h3>Units of work</h3>
+              <p>
+                Requests and work items are linked many-to-many. Priority is computed from
+                reach, and tech debt competes for it on equal terms.
+              </p>
+            </article>
+          </div>
+
+          <p class="closing">
+            <b>Work item closed</b> <span aria-hidden="true">→</span> public statuses
+            updated <span aria-hidden="true">→</span> email to everyone who voted
+            <span aria-hidden="true">→</span> roadmap and changelog
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Screens ───────────────────────────────────────────────────── -->
+      <section id="screens" style="padding-bottom: 0">
+        <div class="page">
+          <p class="label">Screens</p>
+          <h2>What it <b>looks like in use</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Screenshots are taken from the Russian-language demo instance: every UI string
+            lives in <code>content/</code> and is translated per clone.
+          </p>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Request page</span>
+              <h3>A vote is <b>a measure of demand</b></h3>
+              <p>
+                One user, one vote — guaranteed by a unique index rather than a check in
+                code. A thread with team replies, a pinned update, status history and
+                subscriptions.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/post.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Request page: vote counter and vote button, status badge, description and a comment thread with a team reply."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Submitting</span>
+              <h3>Duplicates <b>never reach the database</b></h3>
+              <p>
+                While someone types a title, the portal surfaces similar requests with
+                their votes and status and offers to vote instead of creating a new one.
+                This is the main defence against a pile of duplicates.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/intake.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Submission form: under the title field, an inset reading “Looks like this has been asked” with a “Vote for this” button."
+              />
+            </div>
+          </div>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Admin</span>
+              <h3>A queue that shows <b>where things stalled</b></h3>
+              <p>
+                Dense rows instead of cards: SLA, severity, channel, reach, age. Decisions
+                are one keystroke away, overdue items read in shades of grey, and queue
+                metrics sit in the header.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/triage.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Triage queue: 39 items in dense rows with SLA, severity, channel and reach, plus a decision bar with keyboard shortcuts."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Public face</span>
+              <h3>An answer to <b>“so what will you do about it?”</b></h3>
+              <p>
+                The roadmap collects requests from every board by status, and the changelog
+                links back to them: publishing a release closes the requests and emails
+                everyone who voted for them.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/roadmap.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Roadmap: columns for planned, building and completed with request cards and their vote counts."
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Features ──────────────────────────────────────────────────── -->
+      <section id="features">
+        <div class="page">
+          <p class="label">Features</p>
+          <h2>What is <b>already included</b></h2>
+
+          <ul class="features">
+            <li>
+              <b>Boards and feed</b>
+              <span>Public, private and read-only. Trending, top, newest, filters with counts.</span>
+            </li>
+            <li>
+              <b>Votes without gaming</b>
+              <span>One vote per user, optimistic UI, denormalised counters.</span>
+            </li>
+            <li>
+              <b>Bug intake</b>
+              <span>A type of its own, with severity from the reporter and priority from the team.</span>
+            </li>
+            <li>
+              <b>Duplicate detection</b>
+              <span>Candidates as you type the title, and a vote straight from the inset.</span>
+            </li>
+            <li>
+              <b>Merging duplicates</b>
+              <span>Votes move over deduplicated, subscribers merge, the old link keeps working.</span>
+            </li>
+            <li>
+              <b>Triage queue</b>
+              <span>Auto priority, SLA, needs&nbsp;info with auto-close, full keyboard control.</span>
+            </li>
+            <li>
+              <b>Roadmap and changelog</b>
+              <span>Status columns and a release feed linked back to the requests.</span>
+            </li>
+            <li>
+              <b>No second sign-up</b>
+              <span>Magic link, OAuth via config, SSO from your product with a signed token.</span>
+            </li>
+            <li>
+              <b>SEO out of the box</b>
+              <span>SSR, readable URLs, sitemap, canonical links, OpenGraph previews.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── Get started ───────────────────────────────────────────────── -->
+      <section id="start" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">Get started</p>
+          <h2>A clone per product, <b>updates from upstream</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            One instance serves one product. The logic stays shared and arrives as
+            updates, while the clone only owns config, copy and theme.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <b>Clone it</b>
+              <span
+                >Fork or clone, <code>pnpm install</code>, <code>pnpm dev</code> — the
+                portal opens right away.</span
+              >
+            </li>
+            <li>
+              <b>Edit config and theme</b>
+              <span
+                >Boards and statuses in <code>config/</code>, colours and fonts in
+                <code>theme/tokens.css</code>, copy in <code>content/</code>.</span
+              >
+            </li>
+            <li>
+              <b>Stay up to date</b>
+              <span
+                ><code>git merge upstream/main</code> — the shared logic in
+                <code>src/core/</code> is never edited in a clone.</span
+              >
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ── FAQ ───────────────────────────────────────────────────────── -->
+      <section id="faq" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">FAQ</p>
+          <h2>Common <b>questions</b></h2>
+
+          <div class="faq">
+            <details open>
+              <summary>How far along is the project?</summary>
+              <div class="answer">
+                <p>
+                  The public side and the triage queue are built and clickable, and the
+                  domain rules are real: trending, duplicate search, vote deduplication,
+                  SLA, rate limits. Data still comes from fixtures — Postgres, real
+                  mutations and email are the next iterations.
+                </p>
+                <p>
+                  The prototype is not throwaway: it is built on the target stack, and
+                  exactly one layer is missing — the data source behind the
+                  <code>src/queries/</code> contract.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>How is this different from Canny?</summary>
+              <div class="answer">
+                <p>
+                  Canny collects ideas well, but it does not take bug reports and does not
+                  hold a backlog — that stays outside. Here all three loops share one
+                  model: a request is linked to a unit of work, and closing that work
+                  carries the status all the way back to users.
+                </p>
+                <p>
+                  Plus self-hosting: what comes in with bug reports — screenshots, logs,
+                  personal data — never leaves your infrastructure, and the price is not
+                  charged per product you own.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Can one instance serve several products?</summary>
+              <div class="answer">
+                <p>
+                  No, and that is deliberate: there is no <code>tenant_id</code> in the
+                  schema. Every product gets its own clone, database and domain. The cost
+                  is updating N instances; the gain is a simple schema and complete
+                  freedom to redesign.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>What do I need to deploy it?</summary>
+              <div class="answer">
+                <p>
+                  Node and pnpm to run the portal locally. After that: PostgreSQL and
+                  S3-compatible storage for attachments, plus an email provider key; the
+                  background job queue lives inside Postgres, so no separate Redis is
+                  needed. Deploy with Docker or on Vercel — both paths are described in the
+                  architecture doc.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>How deeply can the design be changed?</summary>
+              <div class="answer">
+                <p>
+                  Completely. A redesign lives in three places:
+                  <code>theme/tokens.css</code>, <code>src/ui/</code> and
+                  <code>content/</code>. Components never touch the database and know
+                  nothing about it, so rewriting the markup cannot break a query.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>What about bug privacy?</summary>
+              <div class="answer">
+                <p>
+                  By default a bug exposes only its title and status publicly; the
+                  description, attachments and auto-diagnostics are visible to the team
+                  only. Security reports are an isolated flow: never indexed, never part of
+                  any public query, and owners are the only ones notified.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>What is deliberately left out?</summary>
+              <div class="answer">
+                <p>
+                  Multi-tenancy and billing: this is a tool you run for yourself, not a
+                  SaaS you resell. An issue tracker — execution stays in Linear, Jira or
+                  ClickUp and syncs with the portal. Crash-report ingestion — that is
+                  Sentry. Anonymous voting — it breaks vote deduplication.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Final CTA ─────────────────────────────────────────────────── -->
+      <section class="dark">
+        <div class="page">
+          <p class="label">Next</p>
+          <h2>Take the repository <b>and run it yourself</b></h2>
+          <p class="lead">
+            The spec, data model, design brief and development plan all live in
+            <code>docs/</code> — worth reading before the first clone.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--onDark" href="https://github.com/Tools-n-Services/backlog-helper"
+              >GitHub</a
+            >
+            <a
+              class="btn btn--onDarkGhost"
+              href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs"
+              >Documentation</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="page footer__inner">
+        <a class="brand" href="#main">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+        <span>Open source · self-hosted · <span class="badge">phase A complete</span></span>
+        <nav class="footer__links" aria-label="Links">
+          <a href="https://github.com/Tools-n-Services/backlog-helper">GitHub</a>
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+            >Product overview</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/01-functional-spec.md"
+            >Spec</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/03-architecture.md"
+            >Architecture</a
+          >
+        </nav>
+      </div>
+    </footer>
+
+    <script src="../copy.js"></script>
+  </body>
+</html>

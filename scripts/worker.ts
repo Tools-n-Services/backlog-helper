@@ -11,22 +11,32 @@
  */
 
 import { prisma } from '@/core/db'
-import { dispatchNotifications, portalOrigin } from '@/core/domain/post/notifications'
+import {
+  dispatchNotifications,
+  dispatchReplies,
+  portalOrigin,
+} from '@/core/domain/post/notifications'
 
 /** Пауза между проходами в режиме --loop. */
 const INTERVAL_MS = 30_000
 
 async function pass() {
   const started = Date.now()
-  const result = await dispatchNotifications(portalOrigin())
+  const origin = portalOrigin()
 
-  if (result.changes === 0 && result.letters === 0 && result.failed === 0) return
+  const statuses = await dispatchNotifications(origin)
+  const replies = await dispatchReplies(origin)
+
+  const letters = statuses.letters + replies.letters
+  const failed = statuses.failed + replies.failed
+  const events = statuses.changes + replies.replies
+  if (events === 0 && letters === 0 && failed === 0) return
 
   const seconds = ((Date.now() - started) / 1000).toFixed(1)
   console.log(
-    `[${new Date().toISOString()}] переходов: ${result.changes}, ` +
-      `писем: ${result.letters}` +
-      (result.failed > 0 ? `, не доставлено: ${result.failed} (повторим)` : '') +
+    `[${new Date().toISOString()}] переходов: ${statuses.changes}, ` +
+      `ответов: ${replies.replies}, писем: ${letters}` +
+      (failed > 0 ? `, не доставлено: ${failed} (повторим)` : '') +
       ` — ${seconds} с`,
   )
 }

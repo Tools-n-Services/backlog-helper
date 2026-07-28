@@ -15,7 +15,8 @@
 import { product } from '@config/product'
 import { statusByKey } from '@config/statuses'
 import { prisma } from '@/core/db'
-import { deliverStatusChange } from '@/core/mail'
+import { deliverReply, deliverStatusChange } from '@/core/mail'
+import { wantsLetter } from './notification-prefs'
 
 /** Сколько переходов разбирать за один проход. */
 const BATCH = 50
@@ -75,11 +76,18 @@ export async function dispatchNotifications(origin: string): Promise<DispatchRes
     const status = statusByKey.get(change.toStatus.key)
     const subscribers = await prisma.subscription.findMany({
       where: { postId: change.post.id, unsubscribedAt: null },
-      select: { token: true, user: { select: { email: true } } },
+      select: {
+        token: true,
+        user: { select: { email: true, notificationPrefs: true } },
+      },
     })
 
     let failures = 0
     for (const subscriber of subscribers) {
+      /* Настройка человека сильнее подписки: подписка отвечает на вопрос
+         «за каким обращением слежу», настройка — «о чём писать». */
+      if (!wantsLetter(subscriber.user.notificationPrefs, 'status')) continue
+
       const sent = await deliverStatusChange({
         to: subscriber.user.email,
         postTitle: change.post.title,
@@ -107,6 +115,125 @@ export async function dispatchNotifications(origin: string): Promise<DispatchRes
   }
 
   return result
+}
+
+/**
+ * Ответы в обсуждении, о которых ещё не писали (FR-302).
+ *
+ * Очередь — сами комментарии с `notified_at is null`, тем же приёмом, что
+ * и смена статуса: событие уже существует строкой, отдельная таблица задач
+ * ради этого не нужна.
+ *
+ * Внутренние заметки команды не рассылаются никогда (FR-139), удалённые —
+ * тоже: человек стёр комментарий, и письмо о нём было бы худшим исходом.
+ */
+export async function pendingReplies(limit = BATCH) {
+  return prisma.comment.findMany({
+    where: { notifiedAt: null, deletedAt: null, internal: false },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: {
+      id: true,
+      body: true,
+      authorId: true,
+      author: { select: { name: true } },
+      parent: { select: { authorId: true } },
+      post: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          authorId: true,
+          board: { select: { slug: true } },
+        },
+      },
+    },
+  })
+}
+
+/**
+ * Кому идёт письмо об ответе.
+ *
+ * Ответ на комментарий — его автору; ответ в обсуждении — автору обращения.
+ * Не всем подписчикам: подписка на обращение означает «сообщайте о судьбе»,
+ * а не «присылайте каждую реплику», и рассылка каждого комментария сорока
+ * голосовавшим — это ровно тот шум, из-за которого отписываются насовсем.
+ *
+ * Себе письмо не уходит: человек знает, что он написал.
+ */
+function replyRecipientId(reply: Awaited<ReturnType<typeof pendingReplies>>[number]) {
+  const target = reply.parent ? reply.parent.authorId : reply.post.authorId
+  if (!target || target === reply.authorId) return null
+  return target
+}
+
+export interface ReplyDispatchResult {
+  replies: number
+  letters: number
+  failed: number
+}
+
+export async function dispatchReplies(origin: string): Promise<ReplyDispatchResult> {
+  const replies = await pendingReplies()
+  const result: ReplyDispatchResult = { replies: 0, letters: 0, failed: 0 }
+
+  for (const reply of replies) {
+    const recipientId = replyRecipientId(reply)
+
+    /* Некому писать — это тоже разобранная очередь, а не повод возвращаться
+       к этой строке в каждом следующем проходе. */
+    if (!recipientId) {
+      await markReplySent(reply.id)
+      result.replies++
+      continue
+    }
+
+    const recipient = await prisma.appUser.findUnique({
+      where: { id: recipientId },
+      select: { email: true, notificationPrefs: true },
+    })
+    const subscription = await prisma.subscription.findUnique({
+      where: { postId_userId: { postId: reply.post.id, userId: recipientId } },
+      select: { token: true, unsubscribedAt: true },
+    })
+
+    const wanted =
+      recipient !== null &&
+      wantsLetter(recipient.notificationPrefs, 'replies') &&
+      subscription?.unsubscribedAt == null
+
+    if (!wanted) {
+      await markReplySent(reply.id)
+      result.replies++
+      continue
+    }
+
+    const sent = await deliverReply({
+      to: recipient.email,
+      postTitle: reply.post.title,
+      postUrl: `${origin}/${reply.post.board.slug}/p/${reply.post.slug}`,
+      authorName: reply.author?.name ?? 'Участник',
+      body: reply.body,
+      isReplyToComment: reply.parent !== null,
+      unsubscribeUrl: subscription
+        ? `${origin}/unsubscribe/confirm?token=${subscription.token}`
+        : `${origin}/profile?tab=notifications`,
+    })
+
+    if (sent.ok) {
+      await markReplySent(reply.id)
+      result.replies++
+      result.letters++
+    } else {
+      result.failed++
+    }
+  }
+
+  return result
+}
+
+async function markReplySent(id: string) {
+  await prisma.comment.update({ where: { id }, data: { notifiedAt: new Date() } })
 }
 
 export type UnsubscribeResult =

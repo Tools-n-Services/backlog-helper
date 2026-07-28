@@ -538,6 +538,8 @@ model Comment {
   likeCount Int       @default(0) @map("like_count")
   /// Soft delete, чтобы не рвать тред.
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Письмо об этом ответе уже разослано. null — ждёт в очереди.
+  notifiedAt DateTime? @map("notified_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 

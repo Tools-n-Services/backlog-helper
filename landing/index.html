@@ -1,0 +1,523 @@
+<!doctype html>
+<!--
+  Лендинг backlog-helper. Статическая страница, деплоится как есть
+  (GitHub Pages / Vercel / любой статик-хостинг): `landing/` — корень сайта.
+
+  Скриншоты в assets/ снимаются с работающего портала: `node landing/capture.mjs`.
+
+  Что заменить перед публикацией:
+    1. <link rel="canonical"> и og:url — на реальный домен лендинга;
+    2. og:image — на картинку 1200×630;
+    3. строку лицензии в подвале — когда в репозитории появится файл LICENSE.
+
+  Визуальный язык — из theme/tokens.css: палитра монохромна, чёрный несёт все
+  действия, цвет остаётся только за семантикой (бейджи статусов).
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Знак из шапки, инлайном: отдельный бинарный файл лендингу не нужен. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%230a0a0a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'>b</text></svg>"
+    />
+    <title>backlog-helper — открытый портал обратной связи, ошибок и бэклога</title>
+    <meta
+      name="description"
+      content="Open source портал обратной связи: запросы функций, сообщения об ошибках, триаж, бэклог, роадмап и changelog. Клонируете репозиторий и разворачиваете у себя."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="backlog-helper — открытый портал обратной связи и бэклога" />
+    <meta
+      property="og:description"
+      content="Сбор запросов и ошибок, триаж, бэклог, роадмап и changelog в одной модели данных. Open source, self-hosted, один клон на продукт."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <meta property="og:locale" content="ru_RU" />
+    <link rel="alternate" hreflang="ru" href="index.html" />
+    <link rel="alternate" hreflang="en" href="en/index.html" />
+    <link rel="alternate" hreflang="es" href="es/index.html" />
+    <link rel="alternate" hreflang="x-default" href="index.html" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Перейти к содержимому</a>
+
+    <div class="banner">
+      <div class="page banner__inner">
+        <span class="banner__tag">в разработке</span>
+        <span
+          >Публичный портал и очередь триажа уже кликаются, следующая итерация —
+          Postgres вместо фикстур.</span
+        >
+        <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
+          >План разработки →</a
+        >
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="page header__inner">
+        <a class="brand" href="#main" aria-label="backlog-helper, в начало">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+
+        <nav class="header__nav" aria-label="Разделы страницы">
+          <a href="#screens">Экраны</a>
+          <a href="#features">Возможности</a>
+          <a href="#start">Запуск</a>
+          <a href="#faq">Вопросы</a>
+          <a href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs">Docs</a>
+        </nav>
+
+        <div class="header__right">
+          <nav class="lang" aria-label="Язык страницы">
+            <a href="index.html" hreflang="ru" aria-current="page">ru</a>
+            <a href="en/index.html" hreflang="en">en</a>
+            <a href="es/index.html" hreflang="es">es</a>
+          </nav>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/Tools-n-Services/backlog-helper"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ── Герой ─────────────────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="page">
+          <h1>Бэклог как <b>сервис</b></h1>
+          <p class="lead">
+            Открытый портал обратной связи: запросы функций и сообщения об ошибках,
+            триаж, бэклог, роадмап и changelog. Клонируете репозиторий — получаете
+            сервис у себя.
+          </p>
+
+          <div class="cmd">
+            <code id="clone-cmd"
+              ><span class="p">$</span> git clone
+              https://github.com/Tools-n-Services/backlog-helper</code
+            >
+            <button
+              type="button"
+              id="copy-btn"
+              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copied="Команда скопирована"
+              data-copy-failed="Не удалось скопировать — выделите команду вручную"
+            >
+              копировать
+            </button>
+          </div>
+          <p aria-live="polite" id="copy-status" class="cmd__status"></p>
+
+          <div class="hero__actions">
+            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Забрать репозиторий</a
+            >
+            <a
+              class="btn btn--ghost"
+              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+              >Описание продукта</a
+            >
+          </div>
+
+          <p class="hero__stack">
+            Next.js · PostgreSQL · self-hosted · один клон на продукт
+          </p>
+
+          <div class="shot shot--raised hero__shot">
+            <img
+              src="assets/feed.png"
+              width="2880"
+              height="1800"
+              alt="Лента доски: обращения с голосами, фильтры по статусу, типу и категории, сортировки «Популярные», «Топ», «Новые»."
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Три контура ───────────────────────────────────────────────── -->
+      <section id="how">
+        <div class="page">
+          <p class="label">Как устроено</p>
+          <h2>Сбор, триаж и бэклог — <b>в одной модели данных</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Обычно это три разные системы, и связь между ними теряется: пользователь не
+            знает, что стало с его запросом, а команда приоритизирует вслепую.
+          </p>
+
+          <div class="contours">
+            <article class="contour">
+              <span class="contour__n">01 — сбор</span>
+              <h3>Обращения с типами</h3>
+              <p>
+                Тип задаёт форму, статусы и видимость: у идеи одни поля, у бага — шаги,
+                частота, severity и окружение.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">02 — триаж</span>
+              <h3>Решение по каждому</h3>
+              <p>
+                Подтвердить, запросить информацию, смержить, отклонить. У решения всегда
+                есть причина, и она уходит письмом.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">03 — бэклог</span>
+              <h3>Единицы работы</h3>
+              <p>
+                Обращения и задачи связаны N:M. Приоритет считается по охвату, а техдолг
+                конкурирует за него наравне.
+              </p>
+            </article>
+          </div>
+
+          <p class="closing">
+            <b>Закрытие задачи</b> <span aria-hidden="true">→</span> публичные статусы
+            обращений <span aria-hidden="true">→</span> письма всем, кто голосовал
+            <span aria-hidden="true">→</span> роадмап и changelog
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Экраны ────────────────────────────────────────────────────── -->
+      <section id="screens" style="padding-bottom: 0">
+        <div class="page">
+          <p class="label">Экраны</p>
+          <h2>Как это <b>выглядит в работе</b></h2>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Обращение</span>
+              <h3>Голос как <b>измерение спроса</b></h3>
+              <p>
+                Один пользователь — один голос, гарантия на уникальном индексе, а не на
+                проверке в коде. Тред с ответами команды, закреплённый апдейт, история
+                статусов и подписка на обновления.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="assets/post.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Страница обращения: счётчик голосов, кнопка голоса, статус, описание, тред комментариев с ответом команды."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Создание</span>
+              <h3>Дубликаты <b>не доезжают до базы</b></h3>
+              <p>
+                Пока человек набирает заголовок, портал показывает похожие обращения с их
+                голосами и статусом и предлагает проголосовать вместо создания. Это
+                главный механизм против свалки повторов.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="assets/intake.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Форма создания обращения: под полем заголовка врезка «Похоже, об этом уже писали» с кнопкой «Голосовать за это»."
+              />
+            </div>
+          </div>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Админка</span>
+              <h3>Очередь, в которой <b>видно, где встало</b></h3>
+              <p>
+                Плотные ряды вместо карточек: SLA, важность, канал, охват, возраст. Решение
+                ставится цифрой с клавиатуры, просрочка читается в оттенках серого,
+                метрики очереди — в шапке.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="assets/triage.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Очередь триажа: 39 обращений плотными строками с SLA, важностью, каналом и охватом, снизу панель решений с горячими клавишами."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Публичное лицо</span>
+              <h3>Ответ на вопрос <b>«что вы с этим сделаете»</b></h3>
+              <p>
+                Роадмап собирает обращения со всех досок по статусам, changelog связан с
+                ними обратно: публикация релиза закрывает обращения и рассылает письма
+                тем, кто за них голосовал.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="assets/roadmap.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Роадмап: колонки по статусам «Запланировано», «В работе», «Готово» с карточками обращений и их голосами."
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Возможности ───────────────────────────────────────────────── -->
+      <section id="features">
+        <div class="page">
+          <p class="label">Возможности</p>
+          <h2>Что уже <b>в коробке</b></h2>
+
+          <ul class="features">
+            <li>
+              <b>Доски и лента</b>
+              <span>Публичные, приватные и readonly. Trending, топ, новые, фильтры со счётчиками.</span>
+            </li>
+            <li>
+              <b>Голоса без накрутки</b>
+              <span>Один голос на пользователя, оптимистичный UI, счётчики денормализованы.</span>
+            </li>
+            <li>
+              <b>Приём ошибок</b>
+              <span>Отдельный тип со своей формой, severity от репортера и priority от команды.</span>
+            </li>
+            <li>
+              <b>Поиск похожих</b>
+              <span>Кандидаты на вводе заголовка и голос из врезки вместо нового обращения.</span>
+            </li>
+            <li>
+              <b>Merge дубликатов</b>
+              <span>Голоса переносятся с дедупликацией, подписчики объединяются, ссылка живёт.</span>
+            </li>
+            <li>
+              <b>Очередь триажа</b>
+              <span>Авто-приоритет, SLA, needs&nbsp;info с авто-закрытием, полная работа с клавиатуры.</span>
+            </li>
+            <li>
+              <b>Роадмап и changelog</b>
+              <span>Колонки по статусам и лента релизов, связанная с обращениями.</span>
+            </li>
+            <li>
+              <b>Вход без второй регистрации</b>
+              <span>Magic link, OAuth конфигом, SSO из основного продукта по токену.</span>
+            </li>
+            <li>
+              <b>SEO из коробки</b>
+              <span>SSR, человекочитаемые URL, sitemap, canonical, OpenGraph-превью.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── Запуск ────────────────────────────────────────────────────── -->
+      <section id="start" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">Запуск</p>
+          <h2>Клон под продукт, <b>обновления из апстрима</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Один инстанс обслуживает один продукт. Логика остаётся общей и приезжает
+            обновлениями, а в клоне живут только конфиг, тексты и тема.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <b>Склонировать</b>
+              <span
+                >Форк или клон, <code>pnpm install</code>, <code>pnpm dev</code> — портал
+                открывается сразу.</span
+              >
+            </li>
+            <li>
+              <b>Поправить конфиг и тему</b>
+              <span
+                >Доски и статусы — <code>config/</code>, цвета и шрифты —
+                <code>theme/tokens.css</code>, тексты — <code>content/</code>.</span
+              >
+            </li>
+            <li>
+              <b>Обновляться</b>
+              <span
+                ><code>git merge upstream/main</code> — общая логика в
+                <code>src/core/</code> в клоне не правится.</span
+              >
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ── FAQ ───────────────────────────────────────────────────────── -->
+      <section id="faq" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">Вопросы</p>
+          <h2>Частые <b>вопросы</b></h2>
+
+          <div class="faq">
+            <details open>
+              <summary>В каком состоянии проект?</summary>
+              <div class="answer">
+                <p>
+                  Публичная часть и очередь триажа собраны и кликаются, доменные правила —
+                  настоящие: trending, поиск похожих, дедупликация голосов, SLA, лимиты.
+                  Данные пока приходят из фикстур: Postgres, настоящие мутации и письма —
+                  следующие итерации.
+                </p>
+                <p>
+                  Прототип не выбрасывается: он собран на целевом стеке, и от продукта в
+                  нём отсутствует ровно один слой — источник данных за контрактом
+                  <code>src/queries/</code>.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Чем это отличается от Canny?</summary>
+              <div class="answer">
+                <p>
+                  Canny отлично собирает идеи, но багов не принимает и бэклог не ведёт —
+                  это остаётся снаружи. Здесь все три контура в одной модели: обращение
+                  связано с единицей работы, а закрытие задачи само доводит статусы до
+                  пользователей.
+                </p>
+                <p>
+                  Плюс self-host: данные из багрепортов (скриншоты, логи, PII) не уезжают
+                  во внешний сервис, а цена не считается за каждый ваш продукт.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Можно один инстанс на несколько продуктов?</summary>
+              <div class="answer">
+                <p>
+                  Нет, и это осознанно: в схеме нет <code>tenant_id</code>. Под каждый
+                  продукт — свой клон, своя база, свой домен. Платим за это обновлением N
+                  инстансов, выигрываем простую схему и полную свободу редизайна.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Что нужно для развёртывания?</summary>
+              <div class="answer">
+                <p>
+                  Node и pnpm, чтобы поднять портал локально. Дальше — PostgreSQL и
+                  S3-совместимое хранилище для вложений, плюс ключ почтового провайдера
+                  для писем; очередь фоновых задач живёт в самом Postgres, отдельный Redis
+                  не нужен. Деплой — Docker или Vercel, обе схемы описаны в архитектуре.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Насколько глубоко можно менять внешний вид?</summary>
+              <div class="answer">
+                <p>
+                  Полностью. Редизайн живёт в трёх местах: <code>theme/tokens.css</code>,
+                  <code>src/ui/</code> и <code>content/</code>. Компоненты не обращаются к
+                  базе и не знают о ней — переписать вёрстку нельзя так, чтобы сломать
+                  выборку.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Что с багами и приватностью?</summary>
+              <div class="answer">
+                <p>
+                  По умолчанию у бага публичны заголовок и статус, а описание, вложения и
+                  авто-диагностика видны только команде. Уязвимости — изолированный поток:
+                  не индексируются, не попадают ни в одну публичную выборку, уведомление
+                  только владельцам.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>Чего здесь сознательно нет?</summary>
+              <div class="answer">
+                <p>
+                  Мультитенантности и биллинга: это инструмент, который вы ставите себе, а
+                  не SaaS для перепродажи. Трекера задач — исполнение остаётся в Linear,
+                  Jira или ClickUp, портал с ними синхронизируется. Приёма потока
+                  краш-репортов — это Sentry. Анонимного голосования — оно ломает
+                  дедупликацию голосов.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Финал ─────────────────────────────────────────────────────── -->
+      <section class="dark">
+        <div class="page">
+          <p class="label">Дальше</p>
+          <h2>Заберите репозиторий <b>и разверните у себя</b></h2>
+          <p class="lead">
+            Спецификация, модель данных, дизайн-бриф и план разработки лежат в
+            <code>docs/</code> — прочитать можно до первого клона.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--onDark" href="https://github.com/Tools-n-Services/backlog-helper"
+              >GitHub</a
+            >
+            <a
+              class="btn btn--onDarkGhost"
+              href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs"
+              >Документация</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="page footer__inner">
+        <a class="brand" href="#main">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+        <span>Open source · self-hosted · <span class="badge">фаза A закрыта</span></span>
+        <nav class="footer__links" aria-label="Ссылки">
+          <a href="https://github.com/Tools-n-Services/backlog-helper">GitHub</a>
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+            >Описание продукта</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/01-functional-spec.md"
+            >Спецификация</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/03-architecture.md"
+            >Архитектура</a
+          >
+        </nav>
+      </div>
+    </footer>
+
+    <script src="copy.js"></script>
+  </body>
+</html>

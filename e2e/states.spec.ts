@@ -112,7 +112,18 @@ test.describe('вошедший участник', () => {
 
     await tabs.getByRole('link', { name: 'Уведомления' }).click()
     await expect(page.getByText('Смена статуса моих обращений')).toBeVisible()
-    await expect(page.getByText(/не чаще раза в две недели/)).toBeVisible()
+
+    /* Настройка обязана пережить перезагрузку: галочка, которая возвращается
+       обратно, — это ровно тот обман, ради устранения которого экран
+       и переделан. */
+    const status = page.locator('input[name="status"]')
+    const before = await status.isChecked()
+
+    await status.setChecked(!before)
+    await page.getByRole('button', { name: 'Сохранить' }).click()
+
+    await page.goto('/profile?tab=notifications')
+    await expect(page.locator('input[name="status"]')).toBeChecked({ checked: !before })
   })
 
 })

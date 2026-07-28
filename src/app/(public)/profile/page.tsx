@@ -4,7 +4,12 @@ import Link from 'next/link'
 
 import { formatCount, plural } from '@/core/content'
 import { getViewer } from '@/core/session'
+import { NOTIFICATION_KINDS } from '@/core/domain/post/notification-prefs'
 import { signOutAction } from '@/features/session/actions'
+import {
+  currentNotificationPrefs,
+  saveNotificationPrefs,
+} from '@/features/session/notification-actions'
 import { queries } from '@/queries'
 import { PostCard } from '@/ui/feed/post-card'
 import { Avatar } from '@/ui/primitives/avatar'
@@ -136,61 +141,51 @@ function Stat({
 }
 
 /**
- * Настройки писем (FR-307). Каждый пункт называет, что именно придёт:
- * «уведомления о статусах» ничего не говорит о частоте и поводе.
+ * Настройки писем (FR-307).
+ *
+ * Каждый пункт называет, что именно придёт: «уведомления о статусах» ничего
+ * не говорит ни о поводе, ни о частоте. Список короткий, потому что в нём
+ * только те письма, которые продукт действительно отправляет: переключатель
+ * без рассылки за ним человек считает настройкой, а почта идёт как раньше —
+ * и следующим он нажимает «спам».
  */
-function NotificationSettings() {
-  const options = [
-    {
-      id: 'status',
-      title: 'Смена статуса моих обращений',
-      hint: 'Одно письмо на переход. Внутренние этапы работы не рассылаются.',
-      checked: true,
-    },
-    {
-      id: 'replies',
-      title: 'Ответы и упоминания',
-      hint: 'Когда команда или другой участник отвечает вам.',
-      checked: true,
-    },
-    {
-      id: 'releases',
-      title: 'Релизы, закрывшие мои обращения',
-      hint: 'Письмо «то, что вы просили, вышло» — не чаще раза в две недели.',
-      checked: true,
-    },
-    {
-      id: 'digest',
-      title: 'Дайджест новых обращений',
-      hint: 'Раз в неделю, по доскам, за которыми вы следите.',
-      checked: false,
-    },
-  ]
+async function NotificationSettings() {
+  const prefs = await currentNotificationPrefs()
 
   return (
-    <ul className="space-y-3">
-      {options.map((option) => (
-        <li
-          key={option.id}
-          className="rounded-card border border-line bg-surface p-4"
-        >
-          <label className="flex cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              defaultChecked={option.checked}
-              className="mt-0.5 size-4 shrink-0 accent-[var(--color-ink)]"
-            />
-            <span className="min-w-0">
-              <span className="block text-body font-semibold text-ink">
-                {option.title}
+    <form action={saveNotificationPrefs}>
+      <ul className="space-y-3">
+        {NOTIFICATION_KINDS.map((kind) => (
+          <li key={kind.key} className="rounded-card border border-line bg-surface p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                name={kind.key}
+                defaultChecked={prefs[kind.key]}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--color-ink)]"
+              />
+              <span className="min-w-0">
+                <span className="block text-body font-semibold text-ink">
+                  {kind.title}
+                </span>
+                <span className="mt-0.5 block text-small text-muted">{kind.hint}</span>
               </span>
-              <span className="mt-0.5 block text-small text-muted">
-                {option.hint}
-              </span>
-            </span>
-          </label>
-        </li>
-      ))}
-    </ul>
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="submit"
+        className="mt-4 rounded-pill bg-ink px-5 py-2 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
+      >
+        Сохранить
+      </button>
+
+      <p className="mt-4 text-small text-faint">
+        Письма приходят только по обращениям, за которыми вы следите. Отписаться
+        от одного обращения можно ссылкой в самом письме — без входа.
+      </p>
+    </form>
   )
 }

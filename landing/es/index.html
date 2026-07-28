@@ -1,0 +1,534 @@
+<!doctype html>
+<!--
+  Versión en español de la landing de backlog-helper.
+
+  La estructura refleja ../index.html (ru) y ../en/index.html una a una: conviene
+  mantener las tres en el mismo orden de secciones para poder replicar cambios.
+  Los estilos y el script de copiado son compartidos: ../styles.css, ../copy.js.
+
+  Antes de publicar: fijar canonical/og:url al dominio real, añadir og:image
+  e indicar la licencia en el pie cuando el repositorio tenga el archivo LICENSE.
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- El símbolo de la cabecera, en línea: la landing no necesita un archivo binario. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%230a0a0a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'>b</text></svg>"
+    />
+    <title>backlog-helper — portal de feedback, errores y backlog en código abierto</title>
+    <meta
+      name="description"
+      content="Portal de feedback de código abierto: solicitudes de funciones, reportes de errores, triaje, backlog, roadmap y changelog. Clona el repositorio y despliégalo en tu infraestructura."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="backlog-helper — portal de feedback y backlog en código abierto"
+    />
+    <meta
+      property="og:description"
+      content="Solicitudes, reportes de errores, triaje, backlog, roadmap y changelog en un solo modelo de datos. Código abierto, autoalojado, un clon por producto."
+    />
+    <meta property="og:locale" content="es_ES" />
+    <link rel="alternate" hreflang="ru" href="../index.html" />
+    <link rel="alternate" hreflang="en" href="../en/index.html" />
+    <link rel="alternate" hreflang="es" href="index.html" />
+    <link rel="alternate" hreflang="x-default" href="../index.html" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Ir al contenido</a>
+
+    <div class="banner">
+      <div class="page banner__inner">
+        <span class="banner__tag">en desarrollo</span>
+        <span
+          >El portal público y la cola de triaje ya son navegables; la siguiente iteración
+          sustituye los datos de prueba por Postgres.</span
+        >
+        <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
+          >Plan de desarrollo →</a
+        >
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="page header__inner">
+        <a class="brand" href="#main" aria-label="backlog-helper, volver arriba">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+
+        <nav class="header__nav" aria-label="Secciones de la página">
+          <a href="#screens">Pantallas</a>
+          <a href="#features">Funciones</a>
+          <a href="#start">Empezar</a>
+          <a href="#faq">Preguntas</a>
+          <a href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs">Docs</a>
+        </nav>
+
+        <div class="header__right">
+          <nav class="lang" aria-label="Idioma de la página">
+            <a href="../index.html" hreflang="ru">ru</a>
+            <a href="../en/index.html" hreflang="en">en</a>
+            <a href="index.html" hreflang="es" aria-current="page">es</a>
+          </nav>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/Tools-n-Services/backlog-helper"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ── Portada ───────────────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="page">
+          <h1>Backlog como <b>servicio</b></h1>
+          <p class="lead">
+            Portal de feedback de código abierto: solicitudes de funciones y reportes de
+            errores, triaje, backlog, roadmap y changelog. Clonas el repositorio y el
+            servicio es tuyo.
+          </p>
+
+          <div class="cmd">
+            <code id="clone-cmd"
+              ><span class="p">$</span> git clone
+              https://github.com/Tools-n-Services/backlog-helper</code
+            >
+            <button
+              type="button"
+              id="copy-btn"
+              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copied="Comando copiado"
+              data-copy-failed="No se pudo copiar: selecciona el comando manualmente"
+            >
+              copiar
+            </button>
+          </div>
+          <p aria-live="polite" id="copy-status" class="cmd__status"></p>
+
+          <div class="hero__actions">
+            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Obtener el repositorio</a
+            >
+            <a
+              class="btn btn--ghost"
+              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+              >Descripción del producto</a
+            >
+          </div>
+
+          <p class="hero__stack">
+            Next.js · PostgreSQL · autoalojado · un clon por producto
+          </p>
+
+          <div class="shot shot--raised hero__shot">
+            <img
+              src="../assets/feed.png"
+              width="2880"
+              height="1800"
+              alt="Listado del tablero: solicitudes con votos, filtros por estado, tipo y categoría, y ordenación por tendencia, top y recientes."
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Tres circuitos ────────────────────────────────────────────── -->
+      <section id="how">
+        <div class="page">
+          <p class="label">Cómo funciona</p>
+          <h2>Recepción, triaje y backlog <b>en un solo modelo de datos</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Normalmente son tres sistemas distintos y el vínculo entre ellos se pierde: el
+            usuario nunca sabe qué pasó con su solicitud y el equipo prioriza a ciegas.
+          </p>
+
+          <div class="contours">
+            <article class="contour">
+              <span class="contour__n">01 — recepción</span>
+              <h3>Solicitudes con tipo</h3>
+              <p>
+                El tipo define el formulario, los estados y la visibilidad: una idea lleva
+                unos campos; un error añade pasos, frecuencia, severidad y entorno.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">02 — triaje</span>
+              <h3>Una decisión por solicitud</h3>
+              <p>
+                Confirmar, pedir información, fusionar, rechazar. Toda decisión lleva un
+                motivo, y ese motivo sale por correo.
+              </p>
+            </article>
+            <article class="contour">
+              <span class="contour__n">03 — backlog</span>
+              <h3>Unidades de trabajo</h3>
+              <p>
+                Solicitudes y tareas se relacionan N:M. La prioridad se calcula por
+                alcance y la deuda técnica compite por ella en igualdad de condiciones.
+              </p>
+            </article>
+          </div>
+
+          <p class="closing">
+            <b>Tarea cerrada</b> <span aria-hidden="true">→</span> estados públicos
+            actualizados <span aria-hidden="true">→</span> correo a quienes votaron
+            <span aria-hidden="true">→</span> roadmap y changelog
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Pantallas ─────────────────────────────────────────────────── -->
+      <section id="screens" style="padding-bottom: 0">
+        <div class="page">
+          <p class="label">Pantallas</p>
+          <h2>Así se <b>ve en funcionamiento</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Las capturas provienen de la instancia de demostración en ruso: todos los
+            textos de la interfaz viven en <code>content/</code> y se traducen en cada clon.
+          </p>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Solicitud</span>
+              <h3>El voto <b>mide la demanda</b></h3>
+              <p>
+                Un usuario, un voto, garantizado por un índice único y no por una
+                comprobación en el código. Hilo con respuestas del equipo, actualización
+                fijada, historial de estados y suscripción.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/post.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Página de solicitud: contador y botón de voto, etiqueta de estado, descripción e hilo de comentarios con respuesta del equipo."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Creación</span>
+              <h3>Los duplicados <b>no llegan a la base</b></h3>
+              <p>
+                Mientras se escribe el título, el portal muestra solicitudes parecidas con
+                sus votos y su estado, y propone votar en lugar de crear otra. Es la
+                defensa principal contra el montón de repetidos.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/intake.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Formulario de creación: bajo el campo de título, un bloque «Parece que ya lo pidieron» con el botón «Votar por esto»."
+              />
+            </div>
+          </div>
+
+          <div class="showcase">
+            <div class="showcase__text">
+              <span class="showcase__tag">Administración</span>
+              <h3>Una cola donde <b>se ve dónde se atascó</b></h3>
+              <p>
+                Filas densas en vez de tarjetas: SLA, severidad, canal, alcance y
+                antigüedad. La decisión se toma con una tecla, el retraso se lee en tonos
+                de gris y las métricas de la cola están en la cabecera.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/triage.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Cola de triaje: 39 solicitudes en filas densas con SLA, severidad, canal y alcance, con una barra de decisiones y atajos de teclado."
+              />
+            </div>
+          </div>
+
+          <div class="showcase showcase--flip">
+            <div class="showcase__text">
+              <span class="showcase__tag">Cara pública</span>
+              <h3>La respuesta a <b>«¿y qué van a hacer con esto?»</b></h3>
+              <p>
+                El roadmap reúne por estado las solicitudes de todos los tableros y el
+                changelog las enlaza de vuelta: publicar una versión las cierra y avisa por
+                correo a quienes votaron.
+              </p>
+            </div>
+            <div class="shot">
+              <img
+                src="../assets/roadmap.png"
+                width="2880"
+                height="1800"
+                loading="lazy"
+                alt="Roadmap: columnas de planificado, en curso y terminado con tarjetas de solicitudes y sus votos."
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Funciones ─────────────────────────────────────────────────── -->
+      <section id="features">
+        <div class="page">
+          <p class="label">Funciones</p>
+          <h2>Lo que <b>ya viene incluido</b></h2>
+
+          <ul class="features">
+            <li>
+              <b>Tableros y listado</b>
+              <span>Públicos, privados y de solo lectura. Tendencia, top, recientes y filtros con contadores.</span>
+            </li>
+            <li>
+              <b>Votos sin manipulación</b>
+              <span>Un voto por usuario, interfaz optimista y contadores desnormalizados.</span>
+            </li>
+            <li>
+              <b>Recepción de errores</b>
+              <span>Tipo propio, con severidad del reportante y prioridad del equipo.</span>
+            </li>
+            <li>
+              <b>Búsqueda de parecidos</b>
+              <span>Candidatos al escribir el título y voto directo desde el bloque.</span>
+            </li>
+            <li>
+              <b>Fusión de duplicados</b>
+              <span>Los votos se trasladan sin duplicar, los suscriptores se unen y el enlace sigue vivo.</span>
+            </li>
+            <li>
+              <b>Cola de triaje</b>
+              <span>Prioridad automática, SLA, needs&nbsp;info con cierre automático y control total por teclado.</span>
+            </li>
+            <li>
+              <b>Roadmap y changelog</b>
+              <span>Columnas por estado y listado de versiones enlazado con las solicitudes.</span>
+            </li>
+            <li>
+              <b>Sin segundo registro</b>
+              <span>Magic link, OAuth por configuración y SSO desde tu producto con un token firmado.</span>
+            </li>
+            <li>
+              <b>SEO desde el inicio</b>
+              <span>SSR, URLs legibles, sitemap, enlaces canónicos y vistas previas OpenGraph.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── Empezar ───────────────────────────────────────────────────── -->
+      <section id="start" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">Empezar</p>
+          <h2>Un clon por producto, <b>actualizaciones desde upstream</b></h2>
+          <p class="lead" style="margin-top: 18px">
+            Una instancia atiende a un producto. La lógica sigue siendo común y llega como
+            actualización; en el clon solo viven la configuración, los textos y el tema.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <b>Clonar</b>
+              <span
+                >Fork o clon, <code>pnpm install</code>, <code>pnpm dev</code>: el portal
+                se abre de inmediato.</span
+              >
+            </li>
+            <li>
+              <b>Ajustar configuración y tema</b>
+              <span
+                >Tableros y estados en <code>config/</code>, colores y tipografías en
+                <code>theme/tokens.css</code>, textos en <code>content/</code>.</span
+              >
+            </li>
+            <li>
+              <b>Mantenerse al día</b>
+              <span
+                ><code>git merge upstream/main</code>: la lógica común de
+                <code>src/core/</code> no se toca en el clon.</span
+              >
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ── Preguntas ─────────────────────────────────────────────────── -->
+      <section id="faq" style="border-top: 1px solid var(--line)">
+        <div class="page">
+          <p class="label">Preguntas</p>
+          <h2>Preguntas <b>frecuentes</b></h2>
+
+          <div class="faq">
+            <details open>
+              <summary>¿En qué estado está el proyecto?</summary>
+              <div class="answer">
+                <p>
+                  La parte pública y la cola de triaje están construidas y son navegables,
+                  y las reglas de dominio son reales: tendencia, búsqueda de parecidos,
+                  deduplicación de votos, SLA y límites. Los datos todavía vienen de
+                  fixtures: Postgres, las mutaciones reales y los correos son las
+                  siguientes iteraciones.
+                </p>
+                <p>
+                  El prototipo no se tira: está hecho sobre el stack definitivo y le falta
+                  exactamente una capa, la fuente de datos detrás del contrato
+                  <code>src/queries/</code>.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿En qué se diferencia de Canny?</summary>
+              <div class="answer">
+                <p>
+                  Canny recoge ideas muy bien, pero no acepta reportes de errores ni
+                  mantiene el backlog: eso queda fuera. Aquí los tres circuitos comparten
+                  un modelo: la solicitud está ligada a una unidad de trabajo y cerrarla
+                  lleva el estado de vuelta hasta los usuarios.
+                </p>
+                <p>
+                  Y además es autoalojado: lo que llega con los reportes de errores
+                  —capturas, registros, datos personales— no sale de tu infraestructura, y
+                  el precio no se cuenta por cada producto que tengas.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿Puede una instancia servir a varios productos?</summary>
+              <div class="answer">
+                <p>
+                  No, y es deliberado: en el esquema no existe <code>tenant_id</code>. Cada
+                  producto tiene su clon, su base de datos y su dominio. El coste es
+                  actualizar N instancias; la ganancia es un esquema simple y libertad
+                  total para rediseñar.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿Qué hace falta para desplegarlo?</summary>
+              <div class="answer">
+                <p>
+                  Node y pnpm para levantar el portal en local. Después: PostgreSQL y
+                  almacenamiento compatible con S3 para los adjuntos, más una clave de
+                  proveedor de correo; la cola de tareas en segundo plano vive dentro de
+                  Postgres, así que no hace falta un Redis aparte. El despliegue puede ser
+                  con Docker o en Vercel: ambas rutas están descritas en la arquitectura.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿Hasta dónde se puede cambiar el aspecto?</summary>
+              <div class="answer">
+                <p>
+                  Por completo. El rediseño vive en tres sitios:
+                  <code>theme/tokens.css</code>, <code>src/ui/</code> y
+                  <code>content/</code>. Los componentes no acceden a la base de datos ni
+                  saben nada de ella, así que reescribir el marcado no puede romper una
+                  consulta.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿Qué pasa con la privacidad de los errores?</summary>
+              <div class="answer">
+                <p>
+                  Por defecto, de un error solo son públicos el título y el estado; la
+                  descripción, los adjuntos y el diagnóstico automático los ve solo el
+                  equipo. Los reportes de seguridad son un flujo aislado: no se indexan, no
+                  entran en ninguna consulta pública y solo se notifica a los propietarios.
+                </p>
+              </div>
+            </details>
+
+            <details>
+              <summary>¿Qué se deja fuera a propósito?</summary>
+              <div class="answer">
+                <p>
+                  Multi-tenancy y facturación: es una herramienta que despliegas para ti,
+                  no un SaaS para revender. Un gestor de tareas: la ejecución se queda en
+                  Linear, Jira o ClickUp y se sincroniza con el portal. La ingesta de
+                  informes de fallos: eso es Sentry. El voto anónimo: rompe la
+                  deduplicación de votos.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── CTA final ─────────────────────────────────────────────────── -->
+      <section class="dark">
+        <div class="page">
+          <p class="label">Siguiente</p>
+          <h2>Llévate el repositorio <b>y despliégalo en tu infraestructura</b></h2>
+          <p class="lead">
+            La especificación, el modelo de datos, el brief de diseño y el plan de
+            desarrollo están en <code>docs/</code>: se pueden leer antes del primer clon.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--onDark" href="https://github.com/Tools-n-Services/backlog-helper"
+              >GitHub</a
+            >
+            <a
+              class="btn btn--onDarkGhost"
+              href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs"
+              >Documentación</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="page footer__inner">
+        <a class="brand" href="#main">
+          <span class="brand__mark" aria-hidden="true">b</span>
+          <span class="brand__name">backlog-helper</span>
+        </a>
+        <span
+          >Código abierto · autoalojado ·
+          <span class="badge">fase A terminada</span></span
+        >
+        <nav class="footer__links" aria-label="Enlaces">
+          <a href="https://github.com/Tools-n-Services/backlog-helper">GitHub</a>
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
+            >Producto</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/01-functional-spec.md"
+            >Especificación</a
+          >
+          <a
+            href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/03-architecture.md"
+            >Arquitectura</a
+          >
+        </nav>
+      </div>
+    </footer>
+
+    <script src="../copy.js"></script>
+  </body>
+</html>

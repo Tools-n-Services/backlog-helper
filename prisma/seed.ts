@@ -499,6 +499,11 @@ async function seedComments(ids: Ids, expanded: ExpandedPost[], postIds: Map<str
           body: node.body,
           pinned: node.pinned,
           createdAt: at(node.agoDays),
+          /* Помечены разосланными — как и история статусов. Это переписка
+             месячной давности, письма о ней по замыслу давно ушли. Иначе
+             первый же проход рассылки отправит тысячу писем об ответах,
+             которых никто не писал. */
+          notifiedAt: at(node.agoDays),
         },
       })
       total++

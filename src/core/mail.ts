@@ -155,6 +155,42 @@ export interface StatusLetter {
  * молчания: человек узнаёт отказ и не узнаёт причину. Поэтому текст решения
  * идёт в тело письма, а не остаётся в админке.
  */
+export interface ReplyLetter {
+  to: string
+  postTitle: string
+  postUrl: string
+  authorName: string
+  body: string
+  /** Ответ на комментарий, а не на само обращение. */
+  isReplyToComment: boolean
+  unsubscribeUrl: string
+}
+
+/**
+ * Ответ в обсуждении (FR-302).
+ *
+ * Текст ответа идёт в письмо целиком, а не заменяется на «вам ответили».
+ * Человек, задавший вопрос, чаще всего получает короткий ответ — и заставлять
+ * его открывать портал ради двух строк значит терять половину обсуждений
+ * на полпути.
+ */
+export async function deliverReply(letter: ReplyLetter): Promise<SendResult> {
+  const what = letter.isReplyToComment
+    ? `${letter.authorName} ответил на ваш комментарий`
+    : `${letter.authorName} ответил в обсуждении вашего обращения`
+
+  return send({
+    to: letter.to,
+    subject: `${letter.postTitle} — новый ответ`,
+    text: [
+      `${what} «${letter.postTitle}»:`,
+      letter.body,
+      letter.postUrl,
+      `\nОтписаться от обновлений этого обращения: ${letter.unsubscribeUrl}`,
+    ].join('\n\n'),
+  })
+}
+
 export async function deliverStatusChange(letter: StatusLetter): Promise<SendResult> {
   const body = [
     `Обращение «${letter.postTitle}» перешло в статус «${letter.statusName}».`,
