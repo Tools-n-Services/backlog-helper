@@ -26,8 +26,9 @@ import {
   dispatchReplies,
   portalOrigin,
 } from '@/core/domain/post/notifications'
+import { processStaleNeedsInfo } from '@/core/domain/triage/needs-info'
 
-type JobName = 'mail' | 'trending' | 'affected' | 'reconcile'
+type JobName = 'mail' | 'needs-info' | 'trending' | 'affected' | 'reconcile'
 
 interface Job {
   name: JobName
@@ -58,6 +59,21 @@ const JOBS: Job[] = [
       return (
         `переходов: ${statuses.changes}, ответов: ${replies.replies}, писем: ${letters}` +
         (failed > 0 ? `, не доставлено: ${failed} (повторим)` : '')
+      )
+    },
+  },
+  {
+    name: 'needs-info',
+    what: 'ожидание ответа автора',
+    /* Раз в час достаточно: сроки здесь в днях, и точность до часа
+       никому не важна. */
+    everyMs: HOUR,
+    run: async () => {
+      const r = await processStaleNeedsInfo(portalOrigin())
+      if (r.reminded + r.closed + r.failed === 0) return null
+      return (
+        `напоминаний: ${r.reminded}, закрыто: ${r.closed}` +
+        (r.failed > 0 ? `, не доставлено: ${r.failed} (повторим)` : '')
       )
     },
   },

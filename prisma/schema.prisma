@@ -459,6 +459,8 @@ model Post {
   firstResponseAt         DateTime?   @map("first_response_at") @db.Timestamptz(6)
   slaDueAt                DateTime?   @map("sla_due_at") @db.Timestamptz(6)
   needsInfoSince          DateTime?   @map("needs_info_since") @db.Timestamptz(6)
+  /// Когда автору напомнили. null — ещё не напоминали.
+  needsInfoRemindedAt     DateTime?   @map("needs_info_reminded_at") @db.Timestamptz(6)
   resolution              Resolution?
   /// Уходит репортеру письмом (FR-535) и показывается во врезке похожих (FR-643).
   resolutionReasonPublic  String?     @map("resolution_reason_public")

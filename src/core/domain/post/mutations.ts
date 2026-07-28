@@ -146,9 +146,60 @@ export async function addComment(input: CommentInput): Promise<{ id: string }> {
       where: { id: input.postId, firstResponseAt: null },
       data: { firstResponseAt: new Date() },
     })
+  } else {
+    await reopenIfAutoClosed(input.postId, input.authorId)
   }
 
   return comment
+}
+
+/**
+ * Возвращает в работу обращение, закрытое по молчанию (FR-533).
+ *
+ * Письмо об авто-закрытии обещает: ответите — вернёмся. Если ответ ничего
+ * не меняет, обещание оказывается вежливой формой отказа, и человек это
+ * запоминает. Поэтому комментарий автора снимает авто-закрытие.
+ *
+ * Только автора и только авто-закрытие: решение, принятое человеком,
+ * комментарием не отменяется — для этого есть очередь триажа.
+ */
+async function reopenIfAutoClosed(postId: string, commenterId: string): Promise<void> {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { authorId: true, resolution: true, statusId: true },
+  })
+  if (!post || post.resolution !== 'auto_closed' || post.authorId !== commenterId) return
+
+  const reopened = await prisma.status.findUnique({
+    where: { key: defaultStatus.key },
+    select: { id: true },
+  })
+  if (!reopened) return
+
+  const note = 'Автор ответил — обращение вернулось в работу.'
+  await prisma.$transaction([
+    prisma.post.update({
+      where: { id: postId },
+      data: {
+        statusId: reopened.id,
+        statusChangedAt: new Date(),
+        resolution: null,
+        resolvedAt: null,
+        resolvedById: null,
+        /* Ход снова у команды: таймер первого ответа начинается заново. */
+        firstResponseAt: null,
+      },
+    }),
+    prisma.statusChange.create({
+      data: {
+        postId,
+        fromStatusId: post.statusId,
+        toStatusId: reopened.id,
+        changedById: commenterId,
+        note,
+      },
+    }),
+  ])
 }
 
 /* ───────────────────────────── Модерация ──────────────────────────── */

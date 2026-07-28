@@ -50,6 +50,19 @@ export interface ProductConfig {
     /** Размер страницы ленты. */
     feedPageSize: number
   }
+  /**
+   * Сколько ждать ответа автора на «нужна информация» (FR-533).
+   *
+   * Терпение у продуктов разное: у портала для внутренней команды неделя —
+   * норма, у массового сервиса обращение без ответа через три дня
+   * уже мёртвое. Поэтому сроки здесь, а не в коде.
+   */
+  needsInfo: {
+    /** Через сколько дней напомнить автору. */
+    remindAfterDays: number
+    /** Через сколько дней закрыть, считая от запроса информации. */
+    closeAfterDays: number
+  }
   /** Период полураспада голоса в днях для trending (02-data-model.md). */
   trendingHalfLifeDays: number
 }
@@ -102,6 +115,12 @@ export const product: ProductConfig = {
     postsPerDay: 5,
     postsPerHour: 2,
     feedPageSize: 12,
+  },
+  needsInfo: {
+    remindAfterDays: 5,
+    /* Считается от даты запроса информации, а не от напоминания: у автора
+       десять дней всего, и напоминание на пятый — не новый отсчёт. */
+    closeAfterDays: 10,
   },
   trendingHalfLifeDays: 21,
 }

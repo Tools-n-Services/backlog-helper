@@ -191,6 +191,43 @@ export async function deliverReply(letter: ReplyLetter): Promise<SendResult> {
   })
 }
 
+export interface NeedsInfoLetter {
+  to: string
+  postTitle: string
+  postUrl: string
+  /** Вопрос команды. Без него напоминание бессмысленно. */
+  question: string | null
+  daysLeft: number
+}
+
+/**
+ * Напоминание автору, что ждут его ответа (FR-533).
+ *
+ * Вопрос повторяется в письме целиком: человек, которому написали неделю
+ * назад, не помнит, о чём именно спрашивали, и «ответьте на портале»
+ * заставляет его сначала вспоминать, а потом искать.
+ */
+export async function deliverNeedsInfoReminder(
+  letter: NeedsInfoLetter,
+): Promise<SendResult> {
+  const days = letter.daysLeft
+  const word = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'
+
+  return send({
+    to: letter.to,
+    subject: `${letter.postTitle} — ждём вашего ответа`,
+    text: [
+      `По обращению «${letter.postTitle}» команда просила уточнить детали.`,
+      letter.question ? `Вопрос:\n${letter.question}` : null,
+      `Ответить можно в обсуждении: ${letter.postUrl}`,
+      `Если ответа не будет, через ${days} ${word} обращение закроется. ` +
+        'Это не окончательно: ответ в обсуждении открывает его заново.',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+  })
+}
+
 export async function deliverStatusChange(letter: StatusLetter): Promise<SendResult> {
   const body = [
     `Обращение «${letter.postTitle}» перешло в статус «${letter.statusName}».`,

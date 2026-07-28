@@ -114,6 +114,8 @@
   --color-status-building-fg: #155f55;
   --color-status-beta-bg: #eef1f6;
   --color-status-beta-fg: #3c5878;
+  --color-status-no-response-bg: #efefee;
+  --color-status-no-response-fg: #5c5c5c;
   --color-status-completed-bg: #e5f0e7;
   --color-status-completed-fg: #1f6b36;
   --color-status-wont-fix-bg: #efefee;

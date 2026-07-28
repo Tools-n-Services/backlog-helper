@@ -85,10 +85,22 @@ export const statuses: StatusConfig[] = [
     isTerminal: true,
   },
   {
+    /* Автор не ответил на запрос информации и обращение закрылось само
+       (FR-533). Отдельный статус, а не «не воспроизводится»: мы не пытались
+       воспроизвести, и не «не будем делать»: решения не принимали. Человеку,
+       который вернётся через месяц, разница видна сразу. */
+    key: 'no-response',
+    name: 'Закрыто без ответа',
+    shape: 'dash',
+    position: 8,
+    showOnRoadmap: false,
+    isTerminal: true,
+  },
+  {
     key: 'wont-fix',
     name: 'Не будем делать',
     shape: 'cross',
-    position: 8,
+    position: 9,
     showOnRoadmap: false,
     isTerminal: true,
   },
