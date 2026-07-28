@@ -16,15 +16,10 @@
 
 import { existsSync } from 'node:fs'
 
-import { PrismaPg } from '@prisma/adapter-pg'
-
-import { PrismaClient } from '@/generated/prisma/client'
+import { prisma } from '@/core/db'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-})
 
 const problems: string[] = []
 
@@ -53,6 +48,25 @@ async function main() {
   check(
     (encoding?.collate ?? '').toUpperCase().includes('UTF'),
     `локаль с UTF-8 (сейчас ${encoding?.collate}) — иначе pg_trgm не видит кириллицу`,
+  )
+
+  /* Часовой пояс соединения.
+     Если он не UTC, драйвер и Postgres расходятся на смещение пояса:
+     приложение записывает один момент, а всё, что сравнивает время внутри
+     SQL, видит другой. Приложение при этом ничего не замечает — значение
+     читается обратно с тем же смещением. Проверяется не настройка,
+     а следствие: возраст только что записанной строки. */
+  const [tz] = await prisma.$queryRaw<{ tz: string }[]>`
+    SELECT current_setting('TimeZone') AS tz
+  `
+  check(tz?.tz === 'UTC', `часовой пояс соединения UTC (сейчас ${tz?.tz})`)
+
+  const [skew] = await prisma.$queryRaw<{ seconds: number }[]>`
+    SELECT abs(extract(epoch FROM now() - ${new Date()}::timestamptz)) AS seconds
+  `
+  check(
+    Number(skew?.seconds ?? 999) < 60,
+    `часы базы и приложения совпадают (расхождение ${Number(skew?.seconds ?? 0).toFixed(0)} с)`,
   )
 
   const [generated] = await prisma.$queryRaw<{ is_generated: string }[]>`

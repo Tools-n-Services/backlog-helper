@@ -28,7 +28,23 @@ function createClient(): PrismaClient {
   }
   /* Prisma 7 работает через драйвер-адаптер: query compiler включён
      по умолчанию и собственного драйвера у клиента больше нет. */
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
+  return new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString,
+      /* Часовой пояс соединения — строго UTC.
+       *
+       * Драйвер отправляет момент времени без указания смещения, и Postgres
+       * трактует его в часовом поясе сессии. На машине в Москве приложение
+       * записывает 16:06Z, а в базу ложится 13:06Z. Обратно значение читается
+       * с тем же смещением, поэтому приложение расхождения не видит вовсе —
+       * зато всё, что сравнивает время ВНУТРИ SQL, ошибается ровно на смещение
+       * пояса: возраст голоса, просроченность SLA, срок ожидания ответа.
+       *
+       * Найдено пересчётом trend_score: он расходился с той же формулой
+       * на 0.6%, и это оказались три часа. */
+      options: '-c timezone=UTC',
+    }),
+  })
 }
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }

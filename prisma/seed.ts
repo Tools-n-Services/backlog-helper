@@ -22,8 +22,6 @@
 
 import { existsSync } from 'node:fs'
 
-import { PrismaPg } from '@prisma/adapter-pg'
-
 import { product } from '@config/product'
 import { statuses as statusConfig } from '@config/statuses'
 import { postTypes } from '@config/post-types'
@@ -49,7 +47,7 @@ import {
 import { trendScore } from '@/core/domain/shared/trending'
 import { slaDueAt } from '@/core/domain/triage/sla'
 import { slugify } from '@/core/slug'
-import { PrismaClient } from '@/generated/prisma/client'
+import { prisma } from '@/core/db'
 import type { Frequency, Privacy } from '@/generated/prisma/enums'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
@@ -58,9 +56,6 @@ const MS_PER_DAY = 86_400_000
 const now = new Date()
 const at = (agoDays: number) => new Date(now.getTime() - agoDays * MS_PER_DAY)
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-})
 
 /** Порядок обратный зависимостям: сначала то, на что ссылаются. */
 const TABLES_IN_WIPE_ORDER = [
