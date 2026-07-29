@@ -81,6 +81,15 @@ async function withStand(
   }
 }
 
+/** Порт, на котором заведомо никто не слушает. */
+async function closedPort(): Promise<number> {
+  const server = createServer()
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  await new Promise<void>((resolve) => server.close(() => resolve()))
+  return port
+}
+
 const letter = {
   to: 'author@example.com',
   subject: 'Обращение перешло в статус «Запланировано»',
@@ -242,6 +251,21 @@ describe('ответы Unisender Go', () => {
       const result = await send(letter)
       assert.equal(result.ok, false)
     })
+  })
+
+  it('недоступный узел называет причину, а не «fetch failed»', async () => {
+    process.env.MAIL_PROVIDER = 'unisender'
+    process.env.UNISENDER_API_KEY = 'test-key-0123456789'
+    /* Порт занимаем и сразу отпускаем: так он заведомо закрыт, и отказ
+       приходит мгновенно. Число наугад дало бы то ли отказ, то ли чужой
+       ответ — в зависимости от того, что запущено на машине. */
+    process.env.UNISENDER_API_URL = `http://127.0.0.1:${await closedPort()}/email/send.json`
+
+    const result = await send(letter)
+    assert.equal(result.ok, false)
+    /* Содержательное `fetch` прячет в cause: без разворачивания цепочки
+       в журнале остаётся строка, по которой ничего не понять. */
+    if (!result.ok) assert.match(result.error, /ECONNREFUSED|refused/i)
   })
 
   it('ответ не в JSON тоже отказ, а не падение', async () => {

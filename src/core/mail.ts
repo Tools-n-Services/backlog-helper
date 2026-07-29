@@ -103,8 +103,32 @@ export async function send(letter: Letter): Promise<SendResult> {
         return { ok: false, error: `Неизвестный MAIL_PROVIDER: ${provider}` }
     }
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    return { ok: false, error: describeError(error) }
   }
+}
+
+/**
+ * Человекочитаемая причина сбоя.
+ *
+ * `fetch` в Node на недоступный узел бросает ровно «fetch failed», а всё
+ * содержательное — отказ соединения, неизвестное имя, обрыв TLS — прячет
+ * в `cause`. Без разворачивания цепочки в журнале остаётся строка, по которой
+ * невозможно отличить закрытый файрволом порт от опечатки в адресе.
+ */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+
+  const parts: string[] = [error.message]
+  let cause: unknown = error.cause
+  /* Цепочка причин бывает длиннее одного звена; ограничиваем, чтобы
+     зацикленная ссылка не превратилась в бесконечный текст. */
+  for (let depth = 0; cause instanceof Error && depth < 3; depth++) {
+    const code = (cause as { code?: string }).code
+    parts.push(code ? `${cause.message} (${code})` : cause.message)
+    cause = cause.cause
+  }
+
+  return parts.join(': ')
 }
 
 /* ─────────────────────────────── SMTP ─────────────────────────────── */
