@@ -53,12 +53,30 @@ function checkProvider() {
 
   if (provider === 'smtp') return checkSmtp()
   if (provider === 'unisender') return checkUnisender()
-  if (provider === 'resend') {
-    check(Boolean(process.env.RESEND_API_KEY), 'RESEND_API_KEY задан')
-    return
-  }
+  if (provider === 'resend') return checkResend()
   if (provider === 'file') {
     console.log(`  письма складываются в ${MAIL_DIR}, в реальные ящики не идут`)
+  }
+}
+
+function checkResend() {
+  check(Boolean(process.env.RESEND_API_KEY), 'RESEND_API_KEY задан')
+
+  const sender = parseSender()
+  /* Общий отправитель сервиса работает без подтверждения домена, но только
+     на адрес владельца аккаунта. Для рассылки подписчикам он не годится,
+     и узнать об этом лучше здесь, чем из отказа на сороковом письме. */
+  if (sender.email === 'onboarding@resend.dev') {
+    console.log(
+      '  onboarding@resend.dev — общий отправитель Resend: письма уходят только\n' +
+        '  на адрес владельца аккаунта. Для рассылки подписчикам нужен свой\n' +
+        '  подтверждённый домен в панели Resend',
+    )
+  } else {
+    const domain = sender.email.split('@')[1]
+    if (domain) {
+      console.log(`  домен ${domain} должен быть подтверждён в панели Resend`)
+    }
   }
 }
 

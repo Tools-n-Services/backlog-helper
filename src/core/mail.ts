@@ -360,15 +360,33 @@ function isTrue(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true'
 }
 
+/* ──────────────────────────────- Resend ──────────────────────────── */
+
+const RESEND_URL = 'https://api.resend.com/emails'
+
+interface ResendResponse {
+  id?: string
+  /** Текст отказа: «domain is not verified», «you can only send to…». */
+  message?: string
+  name?: string
+}
+
 async function sendViaResend(letter: Letter): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY
   if (!key) {
     return { ok: false, error: 'MAIL_PROVIDER=resend, но RESEND_API_KEY не задан' }
   }
+  /* Как и у Unisender: ключ уходит заголовком, а заголовки — latin1. */
+  if (!/^[\x20-\x7E]+$/.test(key)) {
+    return {
+      ok: false,
+      error: 'RESEND_API_KEY содержит символы вне latin1 — вероятно, кириллица в ключе',
+    }
+  }
 
   /* Через HTTP-API напрямую, без клиентской библиотеки: один POST
      не стоит ещё одной зависимости, которую придётся обновлять. */
-  const response = await fetch('https://api.resend.com/emails', {
+  const response = await fetch(process.env.RESEND_API_URL?.trim() || RESEND_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
@@ -382,9 +400,24 @@ async function sendViaResend(letter: Letter): Promise<SendResult> {
     }),
   })
 
+  const body = (await response.json().catch(() => null)) as ResendResponse | null
+
   if (!response.ok) {
-    return { ok: false, error: `Resend ответил ${response.status}: ${await response.text()}` }
+    /* Сообщение сервиса важнее кода: «домен не подтверждён» и «на этот адрес
+       отправлять нельзя» приходят одним и тем же 403, а различать их
+       владельцу портала приходится в первую очередь. */
+    return {
+      ok: false,
+      error: `Resend ответил ${response.status}${body?.message ? `: ${body.message}` : ''}`,
+    }
   }
+
+  /* Успех без идентификатора письма — не успех: значит ответ пришёл
+     не от Resend, а от чего-то на его месте (прокси, заглушка). */
+  if (!body?.id) {
+    return { ok: false, error: 'Resend не вернул идентификатор письма' }
+  }
+
   return { ok: true }
 }
 
