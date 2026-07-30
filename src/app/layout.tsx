@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geologica, IBM_Plex_Mono } from 'next/font/google'
 
 import { product } from '@config/product'
+import { locale } from '@/core/locale'
 
 import './globals.css'
 
@@ -30,13 +31,17 @@ export const metadata: Metadata = {
     'Портал обратной связи: предложения, сообщения об ошибках и то, что мы делаем дальше.',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  /* Язык смотрящего, а не продукта: `lang` читают скринридеры и встроенный
+     переводчик браузера — с чужим значением они переводят уже переведённое. */
+  const lang = await locale()
+
   return (
-    <html lang={product.locale} className={`${geologica.variable} ${plexMono.variable}`}>
+    <html lang={lang} className={`${geologica.variable} ${plexMono.variable}`}>
       <body className="min-h-dvh bg-paper text-ink-2 antialiased">{children}</body>
     </html>
   )

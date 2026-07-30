@@ -35,6 +35,8 @@ export type Privacy = 'public' | 'reporter_team' | 'team_only'
 export interface PostTypeConfig {
   key: string
   name: string
+  /** Название на английском (FR-181). Пусто — показываем основное. */
+  nameEn?: string
   /** Одна строка для экрана выбора типа — что именно сюда писать. */
   description: string
   /** Форма типа: набор полей, обязательность, подсказки (FR-502). */
@@ -73,6 +75,7 @@ export const postTypes: PostTypeConfig[] = [
   {
     key: 'idea',
     name: 'Идея',
+    nameEn: 'Idea',
     description: 'Чего не хватает в продукте или что стоит сделать удобнее.',
     formSchema: [
       {
@@ -113,6 +116,7 @@ export const postTypes: PostTypeConfig[] = [
   {
     key: 'bug',
     name: 'Баг',
+    nameEn: 'Bug',
     description: 'Что-то работает не так, как должно.',
     formSchema: [
       {
@@ -204,6 +208,7 @@ export const postTypes: PostTypeConfig[] = [
   {
     key: 'question',
     name: 'Вопрос',
+    nameEn: 'Question',
     description: 'Не получается разобраться, как что-то работает.',
     formSchema: [
       { name: 'title', label: 'Ваш вопрос', kind: 'text', required: true, maxLength: 120 },

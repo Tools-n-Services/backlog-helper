@@ -1,0 +1,61 @@
+{
+  "nav": {
+    "boards": "All boards",
+    "roadmap": "Roadmap",
+    "changelog": "What's new",
+    "search": "Search",
+    "signIn": "Sign in",
+    "profile": "Profile",
+    "skipToContent": "Skip to content",
+    "language": "Interface language"
+  },
+  "footer": {
+    "poweredBy": "Feedback portal",
+    "docs": "How it works",
+    "privacy": "Privacy"
+  },
+  "home": {
+    "eyebrow": "Feedback",
+    "titleLight": "What to improve",
+    "titleBold": "in the product",
+    "lead": "Tell us what's missing, or back what others have already suggested. We read every request and reply to it.",
+    "boardPosts": "requests",
+    "createCta": "New request"
+  },
+  "common": {
+    "votes": "votes",
+    "comments": "comments",
+    "loadMore": "Show more",
+    "reset": "reset",
+    "retry": "Try again",
+    "posts": ["request", "requests", "requests"],
+    "commentForms": ["comment", "comments", "comments"],
+    "breadcrumbs": "Breadcrumbs",
+    "sort": "Sorting"
+  },
+  "feed": {
+    "createCta": "New request",
+    "emptyTitle": "Nothing here yet",
+    "emptyLead": "This board has just opened. The first request sets the tone for the rest — tell us what's worth improving.",
+    "noMatchTitle": "Nothing matches these filters",
+    "noMatchLead": "Try dropping some conditions — the request you need may sit in another status or category.",
+    "resetFilters": "Reset filters",
+    "closedBoard": "Board is closed"
+  },
+  "post": {
+    "discussion": "Discussion",
+    "attachments": "Attachments",
+    "teamOnly": "team only",
+    "statusHistory": "Status history",
+    "voters": "Voted",
+    "merged": "Merged requests",
+    "translated": "Translated",
+    "showOriginal": "Show original",
+    "showTranslation": "Show translation",
+    "translationPending": "Translation in progress"
+  },
+  "language": {
+    "label": "Language",
+    "hint": "Interface and request translation"
+  }
+}

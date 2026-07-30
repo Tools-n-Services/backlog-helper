@@ -1,8 +1,10 @@
 import Link from 'next/link'
 
 import { product } from '@config/product'
-import { t } from '@/core/content'
+import { localized, locales } from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { getViewer } from '@/core/session'
+import { LanguageSwitch } from '@/features/locale/language-switch'
 import { Avatar } from '@/ui/primitives/avatar'
 
 /**
@@ -10,7 +12,7 @@ import { Avatar } from '@/ui/primitives/avatar'
  * Вёрстка перенесена из design system/Публичный портал - Product.dc.html.
  */
 export async function SiteHeader() {
-  const viewer = await getViewer()
+  const [viewer, t, lang] = await Promise.all([getViewer(), content(), locale()])
   const boards = product.boards
     .filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
     .sort((a, b) => a.position - b.position)
@@ -41,12 +43,13 @@ export async function SiteHeader() {
               href={`/${board.slug}`}
               className="rounded-pill px-3 py-1.5 text-body text-muted transition-colors hover:bg-track hover:text-ink"
             >
-              {board.name}
+              {localized(board.name, board.nameEn, lang)}
             </Link>
           ))}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitch current={lang} options={locales} label={t.nav.language} />
           {product.features.roadmap && (
             <Link
               href="/roadmap"

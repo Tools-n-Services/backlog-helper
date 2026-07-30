@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
-import { formatCount, plural } from '@/core/content'
-import { t } from '@/core/content'
+import { formatCount, localized, plural } from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { queries } from '@/queries'
 
 /**
@@ -9,9 +9,11 @@ import { queries } from '@/queries'
  * пятнадцати тысяч обращений должны выглядеть одинаково прилично.
  */
 export default async function HomePage() {
-  const boards = (await queries.listBoards()).filter(
-    (b) => b.visibility !== 'private',
-  )
+  const [boards, t, lang] = await Promise.all([
+    queries.listBoards().then((all) => all.filter((b) => b.visibility !== 'private')),
+    content(),
+    locale(),
+  ])
 
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-14 md:px-8 lg:px-10">
@@ -35,16 +37,18 @@ export default async function HomePage() {
               className="flex h-full flex-col rounded-card border border-line bg-surface p-5 transition-shadow hover:shadow-flat"
             >
               <span className="flex items-baseline justify-between gap-3">
-                <span className="text-h3 font-bold text-ink">{board.name}</span>
+                <span className="text-h3 font-bold text-ink">
+                  {localized(board.name, board.nameEn, lang)}
+                </span>
                 <span className="tnum shrink-0 text-small text-faint">
-                  {formatCount(board.postCount)}
+                  {formatCount(board.postCount, lang)}
                 </span>
               </span>
               <span className="mt-2 text-small text-muted">
-                {board.description}
+                {localized(board.description, board.descriptionEn, lang)}
               </span>
               <span className="mt-4 font-mono text-label uppercase text-faint">
-                {plural(board.postCount, ['обращение', 'обращения', 'обращений'])}
+                {plural(board.postCount, t.common.posts, lang)}
               </span>
             </Link>
           </li>

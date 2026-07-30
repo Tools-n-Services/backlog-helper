@@ -1,4 +1,4 @@
-import { t } from '@/core/content'
+import { content } from '@/core/locale'
 import { SiteHeader } from '@/ui/layout/site-header'
 import { SiteFooter } from '@/ui/layout/site-footer'
 
@@ -7,11 +7,13 @@ import { SiteFooter } from '@/ui/layout/site-footer'
  * Админка живёт под своим layout — её нельзя делать в этом языке
  * (07-ui-brief.md, раздел 1).
  */
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const t = await content()
+
   return (
     <>
       <a

@@ -14,6 +14,12 @@ export interface BoardConfig {
   /** Стабильный ключ и часть URL. Не меняется после первого деплоя. */
   slug: string
   name: string
+  /**
+   * Название на английском (FR-181). Необязательно: у форка с одним языком
+   * его нет, и заставлять заполнять оба поля — работа ради ничего.
+   */
+  nameEn?: string
+  descriptionEn?: string
   description: string
   visibility: BoardVisibility
   /** Порядок в навигации. */
@@ -83,6 +89,9 @@ export const product: ProductConfig = {
     {
       slug: 'product',
       name: 'Продукт',
+      nameEn: 'Product',
+      descriptionEn:
+        'Feature requests and suggestions for the main app: shifts, templates, permissions.',
       description:
         'Запросы функций и предложения по основному приложению: смены, шаблоны, права.',
       visibility: 'public',
@@ -91,6 +100,9 @@ export const product: ProductConfig = {
     {
       slug: 'bugs',
       name: 'Ошибки',
+      nameEn: 'Bugs',
+      descriptionEn:
+        'Reports of things that work the wrong way. Diagnostics and attachments are visible to the team only.',
       description:
         'Сообщения о том, что работает не так. Диагностика и вложения видны только команде.',
       visibility: 'public',
@@ -99,6 +111,8 @@ export const product: ProductConfig = {
     {
       slug: 'reports',
       name: 'Отчёты и экспорт',
+      nameEn: 'Reports and export',
+      descriptionEn: 'Exports, hour summaries, accounting integrations.',
       description: 'Выгрузки, сводки по часам, интеграции с бухгалтерией.',
       visibility: 'public',
       position: 3,
@@ -106,6 +120,9 @@ export const product: ProductConfig = {
     {
       slug: 'enterprise',
       name: 'Корпоративные клиенты',
+      nameEn: 'Enterprise customers',
+      descriptionEn:
+        'Board for paying companies: integrations, SLA, security requirements.',
       description:
         'Доска для компаний на платном тарифе: интеграции, SLA, требования безопасности.',
       visibility: 'private',

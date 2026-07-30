@@ -14,6 +14,12 @@ import type { Privacy } from '@config/post-types'
 export interface StatusView {
   key: string
   name: string
+  /**
+   * Название на английском (FR-181). Оба сразу, а не одно по языку запроса:
+   * слой запросов не знает, кто смотрит, — он и не должен, иначе его нельзя
+   * будет позвать из воркера, где запроса нет вовсе.
+   */
+  nameEn?: string
   /** Форма маркера: состояние кодируется не только цветом. */
   shape: StatusShape
   isTerminal: boolean
@@ -22,6 +28,7 @@ export interface StatusView {
 export interface PostTypeView {
   key: string
   name: string
+  nameEn?: string
   allowsVotes: boolean
   voteLabel: string
   /** Формы слова для счётчика: голоса у идей, затронутые у багов. */
@@ -31,7 +38,9 @@ export interface PostTypeView {
 export interface BoardView {
   slug: string
   name: string
+  nameEn?: string
   description: string
+  descriptionEn?: string
   visibility: 'public' | 'private' | 'readonly'
   postCount: number
   /** Категории доски целиком — форме нужны все, а не только непустые. */

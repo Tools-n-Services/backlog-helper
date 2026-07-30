@@ -6,7 +6,13 @@ export default defineConfig({
      второй запуск идёт по данным, оставленным первым. */
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
-  use: { baseURL: 'http://localhost:3000' },
+  use: {
+    baseURL: 'http://localhost:3000',
+    /* Русский браузер: язык интерфейса выбирается по Accept-Language,
+       и без этого Chromium со своим en-US открывал бы портал по-английски,
+       а сценарии ищут русские подписи (FR-181). */
+    locale: 'ru-RU',
+  },
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:3000',

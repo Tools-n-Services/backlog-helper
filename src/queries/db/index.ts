@@ -97,7 +97,13 @@ function toAttachmentView(row: {
 function toStatusView(key: string): StatusView {
   const s = statusByKey.get(key)
   if (!s) throw new Error(`Статус ${key} есть в базе, но не описан в config/statuses.ts`)
-  return { key: s.key, name: s.name, shape: s.shape, isTerminal: s.isTerminal }
+  return {
+    key: s.key,
+    name: s.name,
+    nameEn: s.nameEn,
+    shape: s.shape,
+    isTerminal: s.isTerminal,
+  }
 }
 
 function toTypeView(key: string): PostTypeView {
@@ -106,6 +112,7 @@ function toTypeView(key: string): PostTypeView {
   return {
     key: t.key,
     name: t.name,
+    nameEn: t.nameEn,
     allowsVotes: t.allowsVotes,
     voteLabel: t.voteLabel,
     countLabel: t.countLabel,
@@ -359,6 +366,10 @@ export const dbQueries: QueryPort = {
       slug: b.slug,
       name: b.name,
       description: b.description,
+      /* Английские названия — из конфига: база хранит доску, а как она
+         называется на втором языке, решает форк (FR-181). */
+      nameEn: product.boards.find((c) => c.slug === b.slug)?.nameEn,
+      descriptionEn: product.boards.find((c) => c.slug === b.slug)?.descriptionEn,
       visibility: b.visibility,
       /* Денормализованный счётчик, который ведёт триггер: пересчитывать
          его запросом на каждый рендер навигации — верный способ получить
