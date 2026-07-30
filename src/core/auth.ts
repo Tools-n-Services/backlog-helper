@@ -156,6 +156,26 @@ export async function consumeSignInLink(token: string): Promise<ConsumeResult> {
   return { ok: true, userId: result.userId }
 }
 
+/**
+ * Открыть сессию человеку без письма.
+ *
+ * Нужно ровно одному месту — финалу установки (В4): иначе неверно настроенная
+ * почта запирает свежий портал, войти некому, а починить настройки можно
+ * только войдя. Мастер к этому моменту уже прошёл через `INSTALL_TOKEN`,
+ * поэтому вход без письма здесь не дыра, а единственный способ не запереться.
+ */
+export async function openSession(userId: string): Promise<void> {
+  const token = newToken()
+  await prisma.session.create({
+    data: {
+      userId,
+      tokenHash: hash(token),
+      expiresAt: new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000),
+    },
+  })
+  await setSessionCookie(token)
+}
+
 async function setSessionCookie(token: string) {
   const store = await cookies()
   store.set(SESSION_COOKIE, token, {
