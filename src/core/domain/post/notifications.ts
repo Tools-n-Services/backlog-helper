@@ -13,7 +13,7 @@
  */
 
 import { product } from '@config/product'
-import { statusByKey } from '@config/statuses'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import { deliverRelease, deliverReply, deliverStatusChange } from '@/core/mail'
 import { wantsLetter } from './notification-prefs'
@@ -74,11 +74,14 @@ export interface DispatchResult {
  * прислать кому-то второе письмо, чем не прислать первое.
  */
 export async function dispatchNotifications(origin: string): Promise<DispatchResult> {
+  /* Рассылку ведёт воркер, мимо слоя запросов: справочник он обязан
+     загрузить сам — иначе название статуса в письме читать неоткуда. */
+  await loadCatalog()
   const changes = await pendingNotifications()
   const result: DispatchResult = { changes: 0, letters: 0, skipped: 0, failed: 0 }
 
   for (const change of changes) {
-    const status = statusByKey.get(change.toStatus.key)
+    const status = catalog().statusByKey.get(change.toStatus.key)
     const subscribers = await prisma.subscription.findMany({
       where: { postId: change.post.id, unsubscribedAt: null },
       select: {

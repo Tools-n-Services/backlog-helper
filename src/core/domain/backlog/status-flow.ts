@@ -26,7 +26,7 @@
  *    здесь.** Падение почты не должно откатывать смену статуса (FR-309).
  */
 
-import { internalStatusByKey } from '@config/internal-statuses'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 
 export interface PublicEffect {
@@ -58,14 +58,16 @@ export async function applyInternalStatus(
 ): Promise<PublicEffect> {
   if (!input.internalStatusKey) return NOTHING_PUBLIC
 
-  const stage = internalStatusByKey.get(input.internalStatusKey)
+  await loadCatalog()
+  const stage = catalog().internalStatusByKey.get(input.internalStatusKey)
   if (!stage?.publicStatusKey) return NOTHING_PUBLIC
 
   const target = await prisma.status.findUnique({
     where: { key: stage.publicStatusKey },
     select: { id: true, key: true, isTerminal: true },
   })
-  /* Статуса из конфига нет в базе — значит набор правили файлом и не пересеяли.
+  /* Этап ссылается на статус, которого нет: справочник правили в обход
+     маппинга.
      Молчать здесь нельзя: работа выглядит выпущенной, а обращения стоят
      в прежнем статусе, и узнают об этом от пользователей. */
   if (!target) {

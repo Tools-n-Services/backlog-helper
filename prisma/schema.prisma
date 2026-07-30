@@ -151,8 +151,11 @@ enum InsightSource {
 model Board {
   id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String
+  /// Названия на втором языке (FR-181). Пусто — показываем основные.
+  nameEn       String?         @map("name_en")
   slug         String          @unique
   description  String          @default("")
+  descriptionEn String?        @map("description_en")
   visibility   BoardVisibility @default(public)
   hiddenFromNav Boolean        @default(false) @map("hidden_from_nav")
   position     Int
@@ -211,8 +214,11 @@ model Status {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key           String    @unique
   name          String
+  nameEn        String?   @map("name_en")
   /// Токен темы, не hex — см. правила форка.
   color         String    @default("")
+  /// Форма маркера: второй канал кодирования помимо цвета (07-ui-brief.md).
+  shape         String    @default("dot")
   position      Int
   showOnRoadmap Boolean   @default(false) @map("show_on_roadmap")
   isTerminal    Boolean   @default(false) @map("is_terminal")
@@ -232,7 +238,15 @@ model PostType {
   id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key              String      @unique
   name             String
+  nameEn           String?     @map("name_en")
   description      String      @default("")
+  descriptionEn    String?     @map("description_en")
+  /// Заголовок карточки на экране выбора типа: «Что-то работает не так».
+  chooserTitle     String      @default("") @map("chooser_title")
+  chooserTitleEn   String?     @map("chooser_title_en")
+  /// Продолжение заголовка формы: «Расскажите, что сломалось».
+  prompt           String      @default("")
+  promptEn         String?     @map("prompt_en")
   /// Набор полей формы: имя, тип, обязательность, подсказка, варианты (FR-502).
   formSchema       Json        @default("[]") @map("form_schema")
   allowedStatusIds String[]    @map("allowed_status_ids") @db.Uuid
@@ -241,6 +255,10 @@ model PostType {
   allowsVotes      Boolean     @default(true) @map("allows_votes")
   /// «Мне тоже нужно» vs «У меня тоже»: один и тот же голос значит разное.
   voteLabel        String      @default("") @map("vote_label")
+  voteLabelEn      String?     @map("vote_label_en")
+  /// Формы счётного слова: «голос / голоса / голосов».
+  countLabel       String[]    @default([]) @map("count_label")
+  countLabelEn     String[]    @default([]) @map("count_label_en")
   defaultSort      DefaultSort @default(trending) @map("default_sort")
   goesToBacklog    Boolean     @default(true) @map("goes_to_backlog")
   /// Не попадает в публичную ленту вовсе (FR-507).
@@ -812,8 +830,15 @@ model InternalStatus {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key        String   @unique
   name       String
+  /// Что значит этот этап: на доске бэклога стоит рядом с колонкой.
+  hint       String   @default("")
   position   Int
   isTerminal Boolean  @default(false) @map("is_terminal")
+  /// Этап нового элемента. Ровно один на набор.
+  isDefault  Boolean  @default(false) @map("is_default")
+  /// Итог обращений, закрытых через этот этап: fixed или wont_fix.
+  /// Публичный статус связан через `status_map`.
+  publicResolution String? @map("public_resolution")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   items      BacklogItem[]

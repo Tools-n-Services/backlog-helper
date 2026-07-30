@@ -28,7 +28,7 @@ import {
   stagingHours,
   type AttachmentKindKey,
 } from '@config/attachments'
-import { postTypeByKey } from '@config/post-types'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import { sizeLabel } from '@/core/format'
 import { deleteObject, putObject } from '@/core/storage'
@@ -153,7 +153,8 @@ export async function bindAttachments(
   })
   if (!post) return 0
 
-  const privacy = postTypeByKey.get(post.type.key)?.defaultPrivacy ?? 'public'
+  await loadCatalog()
+  const privacy = catalog().typeByKey.get(post.type.key)?.defaultPrivacy ?? 'public'
   const visibility = privacy === 'public' ? 'public' : 'team_only'
 
   const bound = await prisma.attachment.updateMany({

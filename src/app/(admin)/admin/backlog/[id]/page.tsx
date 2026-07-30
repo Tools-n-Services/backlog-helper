@@ -55,7 +55,7 @@ export default async function BacklogItemPage({
   ])
   if (!item) notFound()
 
-  const statuses = listInternalStatuses()
+  const statuses = await listInternalStatuses()
 
   return (
     <div className="mx-auto max-w-page px-4 py-6">

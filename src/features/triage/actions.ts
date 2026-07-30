@@ -10,7 +10,7 @@ import {
   type DecisionOutcome,
   type MergeOutcome,
 } from '@/core/domain/triage/decisions'
-import { statusByKey } from '@config/statuses'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import { can, type Permission } from '@/core/permissions'
 import { getViewer } from '@/core/session'
@@ -111,13 +111,14 @@ export async function mergeCandidatesAction(
     },
   })
 
+  await loadCatalog()
   return rows.map((r) => ({
     id: r.id,
     ref: r.ref,
     title: r.title,
     boardName: r.board.name,
     voteCount: r.voteCount,
-    statusName: statusByKey.get(r.status.key)?.name ?? r.status.key,
+    statusName: catalog().statusByKey.get(r.status.key)?.name ?? r.status.key,
   }))
 }
 

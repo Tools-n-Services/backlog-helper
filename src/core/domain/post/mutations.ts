@@ -7,8 +7,7 @@
  * в модели данных.
  */
 
-import { defaultStatus } from '@config/statuses'
-import { postTypeByKey } from '@config/post-types'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { detectLocale } from '@/core/content'
 import { prisma } from '@/core/db'
 import { slaDueAt } from '@/core/domain/triage/sla'
@@ -32,6 +31,17 @@ export interface VoteResult {
  * `vote_count` не трогаем: его ведёт триггер. Возвращаем значение, прочитанное
  * после операции, — оно уже посчитано базой.
  */
+/**
+ * Статус нового обращения из справочника.
+ *
+ * Помечен флагом, а не «первый по порядку»: порядок статусов — про то,
+ * как они стоят на роадмапе, а не про то, с какого начинается обращение.
+ */
+function defaultStatusKey(): string | null {
+  const statuses = catalog().statuses
+  return (statuses.find((s) => s.isDefault) ?? statuses[0])?.key ?? null
+}
+
 export async function toggleVote(postId: string, userId: string): Promise<VoteResult> {
   const existing = await prisma.vote.findUnique({
     where: { postId_userId: { postId, userId } },
@@ -172,10 +182,11 @@ async function reopenIfAutoClosed(postId: string, commenterId: string): Promise<
   })
   if (!post || post.resolution !== 'auto_closed' || post.authorId !== commenterId) return
 
-  const reopened = await prisma.status.findUnique({
-    where: { key: defaultStatus.key },
-    select: { id: true },
-  })
+  await loadCatalog()
+  const initial = defaultStatusKey()
+  const reopened = initial
+    ? await prisma.status.findUnique({ where: { key: initial }, select: { id: true } })
+    : null
   if (!reopened) return
 
   const note = 'Автор ответил — обращение вернулось в работу.'
@@ -310,7 +321,8 @@ export interface CreatedPost {
 }
 
 export async function createPost(input: CreatePostInput): Promise<CreatedPost> {
-  const type = postTypeByKey.get(input.typeKey)
+  await loadCatalog()
+  const type = catalog().typeByKey.get(input.typeKey)
   if (!type) throw new Error(`Неизвестный тип обращения: ${input.typeKey}`)
 
   const board = await prisma.board.findUnique({
@@ -322,7 +334,7 @@ export async function createPost(input: CreatePostInput): Promise<CreatedPost> {
   const [typeRow, statusRow, sourceRow, category] = await Promise.all([
     prisma.postType.findUnique({ where: { key: input.typeKey }, select: { id: true } }),
     prisma.status.findUnique({
-      where: { key: type.defaultStatusKey || defaultStatus.key },
+      where: { key: type.defaultStatusKey || defaultStatusKey() || '' },
       select: { id: true },
     }),
     prisma.intakeSource.findUnique({

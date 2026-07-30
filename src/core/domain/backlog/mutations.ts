@@ -10,7 +10,7 @@
  * на него: дальше формулировки расходятся, и это нормально.
  */
 
-import { defaultInternalStatus } from '@config/internal-statuses'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import { recalculateBacklogScores } from './scoring'
 import { applyInternalStatus, type PublicEffect } from './status-flow'
@@ -41,10 +41,17 @@ export async function createBacklogItem(
   const title = input.title.trim()
   if (title.length < 3) return { ok: false, reason: 'title-required' }
 
-  const status = await prisma.internalStatus.findUnique({
-    where: { key: defaultInternalStatus.key },
-    select: { id: true },
-  })
+  await loadCatalog()
+  /* Этап нового элемента приходит из справочника: его выбирают в админке,
+     и «первый по порядку» — не то же самое, что «начальный». */
+  const initial =
+    catalog().internalStatuses.find((s) => s.isDefault) ?? catalog().internalStatuses[0]
+  const status = initial
+    ? await prisma.internalStatus.findUnique({
+        where: { key: initial.key },
+        select: { id: true },
+      })
+    : null
 
   /* Фаза наследует тему родителя, если её не задали явно: иначе фильтр
      по теме теряет части крупной работы — а именно по нему и смотрят,

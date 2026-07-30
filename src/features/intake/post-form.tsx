@@ -15,7 +15,7 @@ import { formatWait } from '@/core/domain/intake/rate-limit'
 import { isSearchable } from '@/core/domain/intake/similar'
 import type { FieldErrors, FormValues } from '@/core/domain/intake/validate'
 import type { BoardView, SimilarPostView } from '@/queries/types'
-import type { PostTypeConfig } from '@config/post-types'
+import type { TypeEntry } from '@/core/catalog'
 
 import { searchSimilar, submitPost, type SubmitResult } from './actions'
 import { Field } from './form-field'
@@ -37,7 +37,7 @@ export function PostForm({
   translating = false,
 }: {
   board: BoardView
-  type: PostTypeConfig
+  type: TypeEntry
   t: Dictionary
   lang: Locale
   /** Перевод включён — обещаем его человеку прямо у кнопки (FR-181). */
@@ -370,7 +370,7 @@ function LimitReached({
 }
 
 /** Подпись поля из схемы типа — на языке смотрящего. */
-function fieldLabel(type: PostTypeConfig, name: string, lang: Locale): string {
+function fieldLabel(type: TypeEntry, name: string, lang: Locale): string {
   const field = type.formSchema.find((f) => f.name === name)
   return field ? localized(field.label, field.labelEn, lang) : name
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { product } from '@config/product'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { localized, locales } from '@/core/content'
 import { content, locale } from '@/core/locale'
 import { getViewer } from '@/core/session'
@@ -12,9 +13,16 @@ import { Avatar } from '@/ui/primitives/avatar'
  * Вёрстка перенесена из design system/Публичный портал - Product.dc.html.
  */
 export async function SiteHeader() {
-  const [viewer, t, lang] = await Promise.all([getViewer(), content(), locale()])
-  const boards = product.boards
-    .filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
+  const [viewer, t, lang] = await Promise.all([
+    getViewer(),
+    content(),
+    locale(),
+    /* Доски — из справочника базы, а не из конфига: их состав и названия
+       правятся в админке (В1, docs/09-install.md). */
+    loadCatalog(),
+  ])
+  const boards = catalog()
+    .boards.filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
     .sort((a, b) => a.position - b.position)
 
   return (

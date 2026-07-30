@@ -1,7 +1,7 @@
 'use server'
 
 import { product } from '@config/product'
-import { postTypeByKey } from '@config/post-types'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import {
   bindAttachments,
@@ -103,7 +103,8 @@ export async function submitPost(
   if (!viewer.signedIn) return { ok: false, kind: 'auth', reason: 'unauthorized' }
   if (!canContribute(viewer)) return { ok: false, kind: 'auth', reason: 'banned' }
 
-  const type = postTypeByKey.get(typeKey)
+  await loadCatalog()
+  const type = catalog().typeByKey.get(typeKey)
   const board = await queries.getBoard(boardSlug)
   if (!type || !board) {
     return { ok: false, kind: 'validation', errors: { title: 'Неизвестная доска или тип' } }
@@ -192,7 +193,7 @@ function asString(value: unknown): string | undefined {
  * правки этого кода (FR-502).
  */
 function detailsFrom(typeKey: string, values: FormValues): string {
-  const type = postTypeByKey.get(typeKey)
+  const type = catalog().typeByKey.get(typeKey)
   if (!type) return String(values.details ?? '')
 
   const parts: string[] = []

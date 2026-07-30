@@ -6,7 +6,7 @@
  * config/post-types.ts, а не этого файла.
  */
 
-import type { FormField, PostTypeConfig } from '@config/post-types'
+import type { FormField } from '@config/post-types'
 
 export type FormValues = Record<string, string | string[] | boolean>
 
@@ -39,7 +39,9 @@ function checkField(field: FormField, value: FormValues[string] | undefined): st
 }
 
 export function validateSubmission(
-  type: PostTypeConfig,
+  /* Достаточно схемы: проверке безразлично, откуда тип — из справочника
+     базы или из пресета. */
+  type: { formSchema: FormField[] },
   values: FormValues,
   options: { requireCategory: boolean } = { requireCategory: false },
 ): FieldErrors {

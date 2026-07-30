@@ -13,15 +13,14 @@
  */
 
 import { product } from '@config/product'
-import { statuses, statusByKey } from '@config/statuses'
-import { postTypes, postTypeByKey } from '@config/post-types'
-import { backlogKinds, backlogKindName, internalStatuses, internalStatusByKey } from '@config/internal-statuses'
+import { backlogKinds, backlogKindName } from '@config/internal-statuses'
 import { severities } from '@config/scoring'
 import type { Privacy } from '@config/post-types'
 import type { BacklogKind } from '@/generated/prisma/enums'
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/core/db'
 import { attachmentRules } from '@config/attachments'
+import { catalog } from '@/core/catalog'
 import { insightSourceName } from '@/core/domain/backlog/insights'
 import { changeKindName, changeKinds } from '@/core/domain/changelog/kinds'
 import { autoPriority } from '@/core/domain/triage/priority'
@@ -95,8 +94,10 @@ function toAttachmentView(row: {
 }
 
 function toStatusView(key: string): StatusView {
-  const s = statusByKey.get(key)
-  if (!s) throw new Error(`Статус ${key} есть в базе, но не описан в config/statuses.ts`)
+  const s = catalog().statusByKey.get(key)
+  /* Ключ приходит из внешнего ключа на ту же таблицу — промах означает,
+     что снимок справочника старше, чем данные: статус завели только что. */
+  if (!s) throw new Error(`Статус ${key} не найден в справочнике`)
   return {
     key: s.key,
     name: s.name,
@@ -107,8 +108,8 @@ function toStatusView(key: string): StatusView {
 }
 
 function toTypeView(key: string): PostTypeView {
-  const t = postTypeByKey.get(key)
-  if (!t) throw new Error(`Тип ${key} есть в базе, но не описан в config/post-types.ts`)
+  const t = catalog().typeByKey.get(key)
+  if (!t) throw new Error(`Тип обращения ${key} не найден в справочнике`)
   return {
     key: t.key,
     name: t.name,
@@ -122,11 +123,16 @@ function toTypeView(key: string): PostTypeView {
 }
 
 function countLabelOf(key: string): [string, string, string] {
-  return postTypeByKey.get(key)?.countLabel ?? ['голос', 'голоса', 'голосов']
+  return catalog().typeByKey.get(key)?.countLabel ?? ['голос', 'голоса', 'голосов']
 }
 
 function countLabelEnOf(key: string): [string, string, string] | undefined {
-  return postTypeByKey.get(key)?.countLabelEn
+  return catalog().typeByKey.get(key)?.countLabelEn
+}
+
+/** Типы, попадающие в публичную ленту. Считается при вызове: справочник живой. */
+function listedTypeKeys(): string[] {
+  return catalog().types.filter((t) => t.publicFeed).map((t) => t.key)
 }
 
 function initials(name: string): string {
@@ -170,8 +176,6 @@ function publiclyListed() {
     type: { publicFeed: true },
   }
 }
-
-const listedTypeKeys = postTypes.filter((t) => t.publicFeed).map((t) => t.key)
 
 function encodeCursor(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
@@ -369,7 +373,9 @@ export const dbQueries: QueryPort = {
       select: {
         slug: true,
         name: true,
+        nameEn: true,
         description: true,
+        descriptionEn: true,
         visibility: true,
         postCount: true,
         requireCategory: true,
@@ -383,11 +389,9 @@ export const dbQueries: QueryPort = {
     return rows.map((b) => ({
       slug: b.slug,
       name: b.name,
+      nameEn: b.nameEn ?? undefined,
       description: b.description,
-      /* Английские названия — из конфига: база хранит доску, а как она
-         называется на втором языке, решает форк (FR-181). */
-      nameEn: product.boards.find((c) => c.slug === b.slug)?.nameEn,
-      descriptionEn: product.boards.find((c) => c.slug === b.slug)?.descriptionEn,
+      descriptionEn: b.descriptionEn ?? undefined,
       visibility: b.visibility,
       /* Денормализованный счётчик, который ведёт триггер: пересчитывать
          его запросом на каждый рендер навигации — верный способ получить
@@ -671,8 +675,8 @@ export const dbQueries: QueryPort = {
   },
 
   async getRoadmap(boardSlug?: string, expandStatusKey?: string): Promise<RoadmapView> {
-    const roadmapStatuses = statuses
-      .filter((s) => s.showOnRoadmap)
+    const roadmapStatuses = catalog()
+      .statuses.filter((s) => s.showOnRoadmap)
       .sort((a, b) => a.position - b.position)
 
     const columns = await Promise.all(
@@ -713,8 +717,8 @@ export const dbQueries: QueryPort = {
             boardSlug: p.board.slug,
             boardName: p.board.name,
             title: p.title,
-            typeName: postTypeByKey.get(p.type.key)?.name ?? p.type.key,
-            typeNameEn: postTypeByKey.get(p.type.key)?.nameEn,
+            typeName: catalog().typeByKey.get(p.type.key)?.name ?? p.type.key,
+            typeNameEn: catalog().typeByKey.get(p.type.key)?.nameEn,
             categoryName: p.category?.name ?? null,
             count: p.voteCount,
             countLabel: countLabelOf(p.type.key),
@@ -728,13 +732,12 @@ export const dbQueries: QueryPort = {
     const boardRows = await prisma.board.findMany({
       where: { visibility: 'public' },
       orderBy: { position: 'asc' },
-      select: { slug: true, name: true },
+      select: { slug: true, name: true, nameEn: true },
     })
-    /* Английское название доски живёт в конфиге, а не в базе: база отвечает
-       на вопрос «какие доски есть», конфиг — «как они называются». */
     const boards = boardRows.map((b) => ({
-      ...b,
-      nameEn: product.boards.find((c) => c.slug === b.slug)?.nameEn,
+      slug: b.slug,
+      name: b.name,
+      nameEn: b.nameEn ?? undefined,
     }))
 
     return { columns, boards }
@@ -983,7 +986,7 @@ export const dbQueries: QueryPort = {
       boardName: row.board.name,
       title: row.title,
       details: row.details.split(/\n{2,}/).filter(Boolean),
-      typeName: postTypeByKey.get(row.type.key)?.name ?? row.type.key,
+      typeName: catalog().typeByKey.get(row.type.key)?.name ?? row.type.key,
       authorName: row.author?.name ?? 'Удалённый аккаунт',
       authorEmail: row.author?.email ?? '',
       authorApprovedCount: row.author?._count.posts ?? 0,
@@ -1065,8 +1068,12 @@ export const dbQueries: QueryPort = {
       items: rows.map((r) => toBacklogItemView(r, now)),
       total,
       themes: themes.map((t) => ({ slug: t.slug, name: t.name, count: t._count.items })),
-      statuses: internalStatuses
-        .map((s) => ({ key: s.key, name: s.name, count: statusCounts.get(s.key) ?? 0 }))
+      statuses: catalog()
+        .internalStatuses.map((s) => ({
+          key: s.key,
+          name: s.name,
+          count: statusCounts.get(s.key) ?? 0,
+        }))
         .filter((f) => f.count > 0),
       kinds: backlogKinds
         .map((k) => ({ key: k.key, name: k.name, count: kindCounts.get(k.key) ?? 0 }))
@@ -1304,8 +1311,8 @@ export const dbQueries: QueryPort = {
         severities: severities
           .map((s) => ({ key: s.key, name: s.name, count: severityCounts.get(s.key) ?? 0 }))
           .filter((f) => f.count > 0),
-        types: postTypes
-          .map((t) => ({ key: t.key, name: t.name, count: typeCounts.get(t.key) ?? 0 }))
+        types: catalog()
+          .types.map((t) => ({ key: t.key, name: t.name, count: typeCounts.get(t.key) ?? 0 }))
           .filter((f) => f.count > 0),
       },
     }
@@ -1360,7 +1367,9 @@ type BacklogRow = {
 }
 
 function toBacklogItemView(row: BacklogRow, now: Date): BacklogItemView {
-  const status = row.internalStatus ? internalStatusByKey.get(row.internalStatus.key) : null
+  const status = row.internalStatus
+    ? catalog().internalStatusByKey.get(row.internalStatus.key)
+    : null
   return {
     id: row.id,
     title: row.title,
@@ -1629,11 +1638,11 @@ async function facetsFor(query: FeedQuery, matches: string[] | null) {
   ): FacetView => ({ key, name, count, nameEn })
 
   return {
-    statuses: statuses
-      .map((s) => facet(s.key, s.name, statusCounts.get(s.key) ?? 0, s.nameEn))
+    statuses: catalog()
+      .statuses.map((s) => facet(s.key, s.name, statusCounts.get(s.key) ?? 0, s.nameEn))
       .filter((f) => f.count > 0),
-    types: postTypes
-      .filter((t) => listedTypeKeys.includes(t.key))
+    types: catalog()
+      .types.filter((t) => listedTypeKeys().includes(t.key))
       .map((t) => facet(t.key, t.name, typeCounts.get(t.key) ?? 0, t.nameEn))
       .filter((f) => f.count > 0),
     categories: categoryRefs
@@ -1683,7 +1692,7 @@ function toTriageRow(
     boardSlug: row.board.slug,
     ref: row.ref,
     title: row.title,
-    typeName: postTypeByKey.get(row.type.key)?.name ?? row.type.key,
+    typeName: catalog().typeByKey.get(row.type.key)?.name ?? row.type.key,
     typeKey: row.type.key,
     status: toStatusView(row.status.key),
     severityKey: row.severity,

@@ -6,8 +6,7 @@
  * Тащить их в публичный контракт значит расширять его ради одной формы.
  */
 
-import { internalStatuses } from '@config/internal-statuses'
-import { statusByKey } from '@config/statuses'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 
 export interface ThemeOption {
@@ -36,12 +35,15 @@ export interface InternalStatusOption {
 }
 
 /**
- * Внутренние статусы в порядке этапов.
+ * Внутренние этапы в порядке работы.
  *
- * Источник — конфиг, а не база: набор статусов правит форк файлом, а строки
- * в базе только дают им идентификаторы для внешних ключей.
+ * Источник — база: набор этапов и их привязка к публичным статусам правятся
+ * в админке, а не выкладкой (В1, docs/09-install.md).
  */
-export function listInternalStatuses(): InternalStatusOption[] {
+export async function listInternalStatuses(): Promise<InternalStatusOption[]> {
+  await loadCatalog()
+  const { internalStatuses, statusByKey } = catalog()
+
   return internalStatuses
     .slice()
     .sort((a, b) => a.position - b.position)

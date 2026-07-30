@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { enabledPostTypes, postTypeByKey } from '@config/post-types'
+import { catalog, loadCatalog } from '@/core/catalog'
 import { fill, localized, type Dictionary, type Locale } from '@/core/content'
 import { content, locale } from '@/core/locale'
 import { getViewer } from '@/core/session'
@@ -39,6 +39,9 @@ export default async function NewPostPage({
     getViewer(),
     content(),
     locale(),
+    /* Типы обращений приходят из справочника: их состав правится в админке,
+       а не выкладкой (В1, docs/09-install.md). */
+    loadCatalog(),
   ])
   if (!board || board.visibility !== 'public') notFound()
 
@@ -85,7 +88,7 @@ export default async function NewPostPage({
   }
 
   const typeKey = Array.isArray(typeParam) ? typeParam[0] : typeParam
-  const type = typeKey ? postTypeByKey.get(typeKey) : undefined
+  const type = typeKey ? catalog().typeByKey.get(typeKey) : undefined
   const onForm = Boolean(type?.enabled)
 
   return (
@@ -163,7 +166,7 @@ function TypeChooser({
       <p className="mt-4 max-w-[52ch] text-body-l text-muted">{t.intake.chooserLead}</p>
 
       <ul className="mt-8 space-y-3">
-        {enabledPostTypes.map((type) => (
+        {catalog().enabledTypes.map((type) => (
           <li key={type.key}>
             <Link
               href={`/${boardSlug}/new?type=${type.key}`}

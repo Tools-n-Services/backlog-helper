@@ -88,6 +88,8 @@ async function seedStatuses() {
     data: statusConfig.map((s) => ({
       key: s.key,
       name: s.name,
+      nameEn: s.nameEn ?? null,
+      shape: s.shape,
       /* Цвет — имя токена темы, не hex: правила форка запрещают хранить
          конкретные цвета в данных. */
       color: `status-${s.key}`,
@@ -107,7 +109,13 @@ async function seedPostTypes(statusIds: Map<string, string>) {
       data: {
         key: type.key,
         name: type.name,
+        nameEn: type.nameEn ?? null,
         description: type.description,
+        descriptionEn: type.descriptionEn ?? null,
+        chooserTitle: type.chooserTitle,
+        chooserTitleEn: type.chooserTitleEn ?? null,
+        prompt: type.prompt,
+        promptEn: type.promptEn ?? null,
         /* Форма типа целиком уезжает в jsonb: в базе это данные, а значит
            её можно менять без выкладки кода (FR-502). */
         formSchema: JSON.parse(JSON.stringify(type.formSchema)),
@@ -119,6 +127,9 @@ async function seedPostTypes(statusIds: Map<string, string>) {
         defaultPrivacy: type.defaultPrivacy as Privacy,
         allowsVotes: type.allowsVotes,
         voteLabel: type.voteLabel,
+        voteLabelEn: type.voteLabelEn ?? null,
+        countLabel: type.countLabel,
+        countLabelEn: type.countLabelEn ?? [],
         defaultSort: type.defaultSort,
         goesToBacklog: type.goesToBacklog,
         publicFeed: type.publicFeed,
@@ -161,7 +172,9 @@ async function seedBoards() {
     data: product.boards.map((b) => ({
       slug: b.slug,
       name: b.name,
+      nameEn: b.nameEn ?? null,
       description: b.description,
+      descriptionEn: b.descriptionEn ?? null,
       visibility: b.visibility,
       position: b.position,
       hiddenFromNav: b.hiddenFromNav ?? false,
@@ -637,8 +650,11 @@ async function seedInternalStatuses(statusIds: Map<string, string>) {
     data: internalStatuses.map((s) => ({
       key: s.key,
       name: s.name,
+      hint: s.hint,
       position: s.position,
       isTerminal: s.isTerminal,
+      isDefault: s.isDefault ?? false,
+      publicResolution: s.publicResolution ?? null,
     })),
   })
   const rows = await prisma.internalStatus.findMany()
