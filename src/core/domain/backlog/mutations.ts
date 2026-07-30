@@ -12,6 +12,7 @@
 
 import { defaultInternalStatus } from '@config/internal-statuses'
 import { prisma } from '@/core/db'
+import { applyInternalStatus, type PublicEffect } from './status-flow'
 
 /** Шаг ранга при добавлении в конец: место между соседями для перетаскивания. */
 const RANK_STEP = 1000
@@ -30,7 +31,7 @@ export interface CreateBacklogItemInput {
 }
 
 export type BacklogOutcome =
-  | { ok: true; id: string }
+  | { ok: true; id: string; publicEffect?: PublicEffect }
   | { ok: false; reason: 'title-required' | 'not-found' }
 
 export async function createBacklogItem(
@@ -115,15 +116,29 @@ export interface UpdateBacklogItemInput {
   ownerId?: string | null
   estimate?: string | null
   targetRelease?: string | null
-  /** Ключ внутреннего статуса. Публичные статусы обращений он пока не трогает. */
+  /**
+   * Ключ внутреннего статуса. Смена двигает публичный статус связанных
+   * обращений там, где у этапа есть публичное соответствие (FR-632).
+   */
   internalStatusKey?: string | null
+  /** Публичная формулировка решения: уходит в письмо голосовавшим (FR-636). */
+  decisionReasonPublic?: string | null
+  /** Кто меняет: попадает в историю статусов обращений. */
+  actorId?: string | null
 }
 
 export async function updateBacklogItem(
   id: string,
   input: UpdateBacklogItemInput,
 ): Promise<BacklogOutcome> {
-  const existing = await prisma.backlogItem.findUnique({ where: { id }, select: { id: true } })
+  const existing = await prisma.backlogItem.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      decisionReasonPublic: true,
+      internalStatus: { select: { key: true } },
+    },
+  })
   if (!existing) return { ok: false, reason: 'not-found' }
 
   const title = input.title?.trim()
@@ -139,6 +154,32 @@ export async function updateBacklogItem(
           })
         )?.id ?? null)
 
+  const reason =
+    input.decisionReasonPublic !== undefined
+      ? input.decisionReasonPublic?.trim() || null
+      : existing.decisionReasonPublic
+
+  /* Публичные статусы двигает только СМЕНА этапа, а не каждое сохранение
+     карточки: правку соседнего поля человек делает часто, и второе письмо
+     об одном и том же переходе он считает спамом (FR-634). */
+  const stageChanged =
+    input.internalStatusKey !== undefined &&
+    input.internalStatusKey !== (existing.internalStatus?.key ?? null)
+
+  /* Обращения переводятся ДО записи нового этапа. Порядок неочевидный, но
+     важный: если перевод упадёт (например, публичного статуса из конфига
+     нет в базе), этап останется прежним — и повторное сохранение сработает.
+     В обратном порядке сохранённый этап сделал бы вторую попытку «сменой
+     на тот же самый», то есть тихо ничего не сделал бы. */
+  const publicEffect = stageChanged
+    ? await applyInternalStatus({
+        itemId: id,
+        internalStatusKey: input.internalStatusKey ?? null,
+        actorId: input.actorId ?? null,
+        note: reason,
+      })
+    : undefined
+
   await prisma.backlogItem.update({
     where: { id },
     data: {
@@ -152,10 +193,13 @@ export async function updateBacklogItem(
         ? { targetRelease: input.targetRelease?.trim() || null }
         : {}),
       ...(statusId !== undefined ? { internalStatusId: statusId } : {}),
+      ...(input.decisionReasonPublic !== undefined
+        ? { decisionReasonPublic: reason }
+        : {}),
     },
   })
 
-  return { ok: true, id }
+  return publicEffect ? { ok: true, id, publicEffect } : { ok: true, id }
 }
 
 /**

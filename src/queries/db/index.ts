@@ -50,6 +50,8 @@ import type {
   PostTypeView,
   ProfileView,
   QueryPort,
+  ReleaseAdminView,
+  ReleasesView,
   RoadmapView,
   SimilarPostView,
   SimilarQuery,
@@ -693,7 +695,52 @@ export const dbQueries: QueryPort = {
       where: { slug },
       select: entrySelect,
     })
-    return row ? toEntryView(row) : null
+    /* Неопубликованная запись наружу не отдаётся даже по прямой ссылке:
+       черновик релиза — это анонс до срока, а `slug` у записи предсказуем
+       по версии продукта (FR-166). */
+    return row?.publishedAt ? toEntryView(row) : null
+  },
+
+  /**
+   * Релизы глазами команды (FR-165).
+   *
+   * Черновики и запланированные впереди: это то, с чем работают. К каждой
+   * записи — список обращений, которые публикация закроет, и оценка числа
+   * писем. Публикацию нельзя отозвать, поэтому её последствия видны до нажатия,
+   * а не после.
+   */
+  async getReleases(): Promise<ReleasesView> {
+    const [pending, published] = await Promise.all([
+      prisma.changelogEntry.findMany({
+        where: { publishedAt: null },
+        /* Со сроком — впереди и в порядке срока: у них дата уже обещана. */
+        orderBy: [{ scheduledFor: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],
+        select: releaseSelect,
+      }),
+      prisma.changelogEntry.findMany({
+        where: { publishedAt: { not: null } },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+        select: releaseSelect,
+      }),
+    ])
+
+    const postIds = [...pending, ...published].flatMap((r) => r.posts.map((p) => p.post.id))
+    /* Одним запросом на всё, а не по записи: живых подписок у обращения
+       десятки, и N+1 здесь читался бы как «экран релизов медленный». */
+    const subscriptions = postIds.length
+      ? await prisma.subscription.groupBy({
+          by: ['postId'],
+          where: { postId: { in: postIds }, unsubscribedAt: null },
+          _count: { _all: true },
+        })
+      : []
+    const byPost = new Map(subscriptions.map((s) => [s.postId, s._count._all]))
+
+    return {
+      pending: pending.map((r) => toReleaseView(r, byPost)),
+      published: published.map((r) => toReleaseView(r, byPost)),
+    }
   },
 
   /**
@@ -872,6 +919,7 @@ export const dbQueries: QueryPort = {
       where: { id },
       select: {
         ...backlogSelect,
+        decisionReasonPublic: true,
         parent: { select: { id: true, title: true } },
         children: { orderBy: { rank: 'asc' }, select: backlogSelect },
         posts: {
@@ -897,6 +945,7 @@ export const dbQueries: QueryPort = {
     return {
       ...toBacklogItemView(row, now),
       parent: row.parent,
+      decisionReasonPublic: row.decisionReasonPublic,
       children: row.children.map((c) => toBacklogItemView(c, now)),
       posts: row.posts
         .map(({ post }) => ({
@@ -1186,6 +1235,89 @@ function toEntryView(
       count: post.voteCount,
       countLabel: countLabelOf(post.type.key),
     })),
+  }
+}
+
+const releaseSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  version: true,
+  publishedAt: true,
+  scheduledFor: true,
+  _count: { select: { changes: true } },
+  posts: {
+    select: {
+      post: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          voteCount: true,
+          board: { select: { slug: true } },
+          status: { select: { key: true } },
+          type: { select: { key: true } },
+        },
+      },
+    },
+  },
+} as const
+
+/** Дата со временем: у отложенной публикации важен час, а не только день. */
+function momentLabel(at: Date): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(at)
+}
+
+function toReleaseView(
+  row: {
+    id: string
+    slug: string
+    title: string
+    version: string | null
+    publishedAt: Date | null
+    scheduledFor: Date | null
+    _count: { changes: number }
+    posts: {
+      post: {
+        id: string
+        slug: string
+        title: string
+        voteCount: number
+        board: { slug: string }
+        status: { key: string }
+        type: { key: string }
+      }
+    }[]
+  },
+  subscriptionsByPost: Map<string, number>,
+): ReleaseAdminView {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    version: row.version,
+    publishedLabel: row.publishedAt ? momentLabel(row.publishedAt) : null,
+    scheduledLabel: row.scheduledFor ? momentLabel(row.scheduledFor) : null,
+    changeCount: row._count.changes,
+    posts: row.posts
+      .map(({ post }) => ({
+        slug: post.slug,
+        boardSlug: post.board.slug,
+        title: post.title,
+        status: toStatusView(post.status.key),
+        count: post.voteCount,
+        countLabel: countLabelOf(post.type.key),
+      }))
+      .sort((a, b) => b.count - a.count),
+    letters: row.posts.reduce(
+      (sum, { post }) => sum + (subscriptionsByPost.get(post.id) ?? 0),
+      0,
+    ),
   }
 }
 

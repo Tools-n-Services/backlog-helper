@@ -16,6 +16,7 @@
  */
 
 import { prisma } from '@/core/db'
+import { publishScheduled } from '@/core/domain/changelog/releases'
 import {
   recalculateAffected,
   recalculateTrending,
@@ -28,7 +29,7 @@ import {
 } from '@/core/domain/post/notifications'
 import { processStaleNeedsInfo } from '@/core/domain/triage/needs-info'
 
-type JobName = 'mail' | 'needs-info' | 'trending' | 'affected' | 'reconcile'
+type JobName = 'releases' | 'mail' | 'needs-info' | 'trending' | 'affected' | 'reconcile'
 
 interface Job {
   name: JobName
@@ -43,6 +44,22 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 
 const JOBS: Job[] = [
+  {
+    name: 'releases',
+    what: 'публикация релизов',
+    /* Минута: релиз объявляют одновременно в нескольких местах, и запись,
+       вышедшая на портале на полчаса позже рассылки, ломает согласованную
+       дату так же, как вышедшая раньше. Запрос дешёвый — черновиков со
+       сроком единицы. */
+    everyMs: MINUTE,
+    /* Стоит перед рассылкой намеренно: тогда письма о выпуске уходят тем же
+       проходом, а не ждут следующего. */
+    run: async () => {
+      const r = await publishScheduled()
+      if (r.published === 0) return null
+      return `опубликовано записей: ${r.published}, закрыто обращений: ${r.posts}`
+    },
+  },
   {
     name: 'mail',
     what: 'рассылка',

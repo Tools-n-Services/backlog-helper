@@ -15,7 +15,7 @@
 import { product } from '@config/product'
 import { statusByKey } from '@config/statuses'
 import { prisma } from '@/core/db'
-import { deliverReply, deliverStatusChange } from '@/core/mail'
+import { deliverRelease, deliverReply, deliverStatusChange } from '@/core/mail'
 import { wantsLetter } from './notification-prefs'
 
 /** Сколько переходов разбирать за один проход. */
@@ -43,6 +43,9 @@ export async function pendingNotifications(limit = BATCH) {
       id: true,
       note: true,
       toStatus: { select: { key: true } },
+      /* Отметка релиза меняет само письмо: у выпуска своя формулировка
+         и ссылка на запись changelog (FR-303). */
+      releaseEntry: { select: { slug: true, title: true } },
       post: {
         select: {
           id: true,
@@ -85,20 +88,38 @@ export async function dispatchNotifications(origin: string): Promise<DispatchRes
     let failures = 0
     for (const subscriber of subscribers) {
       /* Настройка человека сильнее подписки: подписка отвечает на вопрос
-         «за каким обращением слежу», настройка — «о чём писать». */
+         «за каким обращением слежу», настройка — «о чём писать».
+
+         Выпуск проверяется той же настройкой «смена статуса», а не своей:
+         обещать отдельный переключатель, за которым стоит то же событие
+         в жизни обращения, значит плодить настройки, разницу между которыми
+         не объяснить. Кто отказался от писем о судьбе обращения, отказался
+         и от этого. */
       if (!wantsLetter(subscriber.user.notificationPrefs, 'status')) continue
 
-      const sent = await deliverStatusChange({
-        to: subscriber.user.email,
-        postTitle: change.post.title,
-        postUrl: `${origin}/${change.post.board.slug}/p/${change.post.slug}`,
-        statusName: status?.name ?? change.toStatus.key,
-        note: change.note,
-        /* Отписка одним переходом, без входа: требовать авторизацию
-           у человека, который хочет перестать получать письма, — верный
-           способ получить жалобу на спам вместо отписки (FR-305). */
-        unsubscribeUrl: `${origin}/unsubscribe/confirm?token=${subscriber.token}`,
-      })
+      const postUrl = `${origin}/${change.post.board.slug}/p/${change.post.slug}`
+      /* Отписка одним переходом, без входа: требовать авторизацию
+         у человека, который хочет перестать получать письма, — верный
+         способ получить жалобу на спам вместо отписки (FR-305). */
+      const unsubscribeUrl = `${origin}/unsubscribe/confirm?token=${subscriber.token}`
+
+      const sent = change.releaseEntry
+        ? await deliverRelease({
+            to: subscriber.user.email,
+            postTitle: change.post.title,
+            postUrl,
+            releaseTitle: change.releaseEntry.title,
+            releaseUrl: `${origin}/changelog/${change.releaseEntry.slug}`,
+            unsubscribeUrl,
+          })
+        : await deliverStatusChange({
+            to: subscriber.user.email,
+            postTitle: change.post.title,
+            postUrl,
+            statusName: status?.name ?? change.toStatus.key,
+            note: change.note,
+            unsubscribeUrl,
+          })
       if (sent.ok) result.letters++
       else failures++
     }

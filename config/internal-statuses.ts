@@ -28,6 +28,15 @@ export interface InternalStatusConfig {
    * null — переход внутренний, пользователю не видим и писем не рассылает.
    */
   publicStatusKey: string | null
+  /**
+   * Итог обращения для отчётности, если переход его закрывает.
+   *
+   * Отдельно от статуса, потому что «Не будем делать» и «Выполнено» —
+   * это разные итоги одного факта закрытия, и по ним считают, чем именно
+   * заканчиваются запросы людей. Набор значений — перечисление в базе,
+   * форк меняет не его, а привязку к своим этапам.
+   */
+  publicResolution?: 'fixed' | 'wont_fix'
 }
 
 export const internalStatuses: InternalStatusConfig[] = [
@@ -83,6 +92,7 @@ export const internalStatuses: InternalStatusConfig[] = [
     position: 6,
     isTerminal: true,
     publicStatusKey: 'completed',
+    publicResolution: 'fixed',
   },
   {
     key: 'dropped',
@@ -91,6 +101,7 @@ export const internalStatuses: InternalStatusConfig[] = [
     position: 7,
     isTerminal: true,
     publicStatusKey: 'wont-fix',
+    publicResolution: 'wont_fix',
   },
 ]
 

@@ -1,6 +1,6 @@
 import type { InternalStatusOption, ThemeOption } from '@/core/domain/backlog/options'
 import { backlogKinds } from '@config/internal-statuses'
-import type { BacklogItemView } from '@/queries/types'
+import type { BacklogItemDetailView } from '@/queries/types'
 
 /**
  * Поля элемента бэклога — общие для создания и правки.
@@ -13,7 +13,7 @@ export function ItemFields({
   themes,
   statuses,
 }: {
-  item?: BacklogItemView
+  item?: BacklogItemDetailView
   themes: ThemeOption[]
   statuses?: InternalStatusOption[]
 }) {
@@ -82,12 +82,30 @@ export function ItemFields({
               defaultValue={item?.statusKey ?? ''}
               className="h-8 w-full rounded-field border border-line bg-surface px-2 text-small text-ink-2"
             >
+              {/* Публичное следствие — в самой подписи варианта, а не в тексте
+                  рядом: этап выбирают один раз и в этот момент решают судьбу
+                  чужого обращения. Стрелка отвечает на вопрос «увидит ли это
+                  пользователь» до сохранения, а не после (FR-632, FR-634). */}
               {statuses.map((status) => (
                 <option key={status.key} value={status.key}>
-                  {status.name}
+                  {status.publicStatusName && status.publicStatusName !== status.name
+                    ? `${status.name} → ${status.publicStatusName}`
+                    : status.name}
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field
+            label="Публичная причина"
+            hint="Уходит письмом всем, кто голосовал, когда работа выпущена или отклонена"
+          >
+            <textarea
+              name="decisionReasonPublic"
+              rows={2}
+              defaultValue={item?.decisionReasonPublic ?? ''}
+              className="w-full resize-y rounded-field border border-line bg-surface px-2.5 py-1.5 text-small text-ink-2"
+            />
           </Field>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -119,10 +137,15 @@ export function ItemFields({
  * Пояснение к текущему этапу.
  *
  * «Проверка» и «Исследуем» понимают по-разному даже внутри одной команды,
- * а от этого зависит, увидит ли пользователь смену статуса.
+ * а от этого зависит, увидит ли пользователь смену статуса. Поэтому
+ * к пояснению добавляется то, что видно снаружи прямо сейчас.
  */
 function hintFor(statuses: InternalStatusOption[], key: string | null | undefined) {
-  return statuses.find((s) => s.key === key)?.hint
+  const stage = statuses.find((s) => s.key === key)
+  if (!stage) return undefined
+  return stage.publicStatusName
+    ? `${stage.hint}. Связанные обращения показывают «${stage.publicStatusName}»`
+    : `${stage.hint}. Пользователю этот этап не виден`
 }
 
 function Field({

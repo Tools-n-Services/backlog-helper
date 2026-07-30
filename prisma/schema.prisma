@@ -639,20 +639,24 @@ model PostTag {
 /// в очередь отсюда, а не из кода смены статуса: падение почты не должно
 /// откатывать статус (FR-309).
 model StatusChange {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  postId       String    @map("post_id") @db.Uuid
-  fromStatusId String?   @map("from_status_id") @db.Uuid
-  toStatusId   String    @map("to_status_id") @db.Uuid
-  changedById  String?   @map("changed_by") @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId         String    @map("post_id") @db.Uuid
+  fromStatusId   String?   @map("from_status_id") @db.Uuid
+  toStatusId     String    @map("to_status_id") @db.Uuid
+  changedById    String?   @map("changed_by") @db.Uuid
   /// Текст апдейта для подписчиков.
-  note         String?
-  notifiedAt   DateTime? @map("notified_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  note           String?
+  /// Переход вызван публикацией релиза (FR-165): письмо уходит другое —
+  /// «то, что вы просили, вышло», со ссылкой на запись changelog.
+  releaseEntryId String?   @map("release_entry_id") @db.Uuid
+  notifiedAt     DateTime? @map("notified_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  fromStatus Status?  @relation("StatusChangeFrom", fields: [fromStatusId], references: [id])
-  toStatus   Status   @relation("StatusChangeTo", fields: [toStatusId], references: [id])
-  changedBy  AppUser? @relation(fields: [changedById], references: [id])
+  post         Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  fromStatus   Status?         @relation("StatusChangeFrom", fields: [fromStatusId], references: [id])
+  toStatus     Status          @relation("StatusChangeTo", fields: [toStatusId], references: [id])
+  changedBy    AppUser?        @relation(fields: [changedById], references: [id])
+  releaseEntry ChangelogEntry? @relation(fields: [releaseEntryId], references: [id], onDelete: SetNull)
 
   @@index([postId, createdAt])
   @@map("status_change")
@@ -696,8 +700,9 @@ model ChangelogEntry {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  changes ChangelogChange[]
-  posts   ChangelogPost[]
+  changes       ChangelogChange[]
+  posts         ChangelogPost[]
+  statusChanges StatusChange[]
 
   @@index([publishedAt])
   @@map("changelog_entry")

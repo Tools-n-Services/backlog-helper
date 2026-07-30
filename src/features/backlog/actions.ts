@@ -79,10 +79,19 @@ export async function updateItemAction(id: string, formData: FormData): Promise<
     estimate: String(formData.get('estimate') ?? ''),
     targetRelease: String(formData.get('targetRelease') ?? ''),
     internalStatusKey: String(formData.get('statusKey') ?? '') || null,
+    decisionReasonPublic: String(formData.get('decisionReasonPublic') ?? ''),
+    /* Кто перевёл этап — он же автор смены публичного статуса в истории
+       связанных обращений: смену видно на публичной странице, и «изменено
+       системой» там читается как сбой. */
+    actorId: viewer.id,
   })
 
   revalidatePath(`/admin/backlog/${id}`)
   revalidatePath('/admin/backlog')
+  /* Смена этапа могла перевести связанные обращения: их публичные страницы
+     и лента обязаны показать это сразу, иначе человек, которому уже ушло
+     письмо, откроет ссылку и увидит прежний статус. */
+  revalidatePath('/', 'layout')
 }
 
 export async function linkPostAction(itemId: string, postId: string): Promise<Result> {

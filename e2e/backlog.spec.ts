@@ -70,6 +70,40 @@ test.describe('от имени команды', () => {
     await linked.click()
     await expect(page.getByRole('link', { name: new RegExp(escape(workTitle)) })).toBeVisible()
   })
+
+  test('этап работы двигает публичный статус связанного обращения', async ({ page }) => {
+    /* То, ради чего продукт существует (FR-632): человек проголосовал
+       и узнаёт судьбу запроса, ничего для этого не делая. */
+    await page.goto('/admin/backlog/new')
+    const title = `Проверка e2e: гибкая выгрузка табеля ${Date.now()}`
+    await page.getByLabel('Название работы').fill(title)
+    await page.getByRole('button', { name: 'Создать' }).click()
+    await expect(page.getByRole('heading', { name: title })).toBeVisible()
+
+    await page.getByPlaceholder('Привязать обращение').fill('табеля')
+    const candidate = page.locator('main button').filter({ hasText: 'напрямую в 1С' }).first()
+    await expect(candidate).toBeVisible()
+    await candidate.click()
+
+    const linked = page.getByRole('link', { name: 'Выгрузка табеля напрямую в 1С' })
+    await expect(linked).toBeVisible()
+
+    /* Публичное следствие названо в самой подписи варианта: этап выбирают
+       один раз, и в этот момент решают судьбу чужого обращения. */
+    const stage = page.getByLabel('Этап')
+    await expect(stage).toContainText('Готово к работе → Запланировано')
+    await stage.selectOption('ready')
+    await page.getByRole('button', { name: 'Сохранить' }).click()
+
+    /* Статус виден и в карточке работы, и на публичной странице обращения:
+       второе и есть то, что получит человек по ссылке из письма. */
+    await expect(page.locator('main li').filter({ hasText: 'напрямую в 1С' })).toContainText(
+      'Запланировано',
+    )
+    await linked.click()
+    await expect(page.locator('h1')).toHaveText('Выгрузка табеля напрямую в 1С')
+    await expect(page.getByText('Запланировано').first()).toBeVisible()
+  })
 })
 
 /** Заголовок работы уходит в регулярное выражение и может содержать что угодно. */

@@ -65,6 +65,13 @@ export interface ProductConfig {
   }
   /** Период полураспада голоса в днях для trending (02-data-model.md). */
   trendingHalfLifeDays: number
+  /**
+   * Публичный статус обращений, закрытых публикацией релиза (FR-165).
+   *
+   * Ключ, а не значение перечисления: набор статусов правит форк
+   * в `config/statuses.ts`, и «Выполнено» у него может называться иначе.
+   */
+  releasedStatusKey: string
 }
 
 export const product: ProductConfig = {
@@ -123,4 +130,5 @@ export const product: ProductConfig = {
     closeAfterDays: 10,
   },
   trendingHalfLifeDays: 21,
+  releasedStatusKey: 'completed',
 }

@@ -7,6 +7,7 @@
  */
 
 import { internalStatuses } from '@config/internal-statuses'
+import { statusByKey } from '@config/statuses'
 import { prisma } from '@/core/db'
 
 export interface ThemeOption {
@@ -27,6 +28,11 @@ export interface InternalStatusOption {
   name: string
   hint: string
   isTerminal: boolean
+  /**
+   * Публичный статус, в который уйдут связанные обращения. null — переход
+   * внутренний: пользователь его не увидит и письма не получит (FR-634).
+   */
+  publicStatusName: string | null
 }
 
 /**
@@ -39,5 +45,13 @@ export function listInternalStatuses(): InternalStatusOption[] {
   return internalStatuses
     .slice()
     .sort((a, b) => a.position - b.position)
-    .map(({ key, name, hint, isTerminal }) => ({ key, name, hint, isTerminal }))
+    .map(({ key, name, hint, isTerminal, publicStatusKey }) => ({
+      key,
+      name,
+      hint,
+      isTerminal,
+      publicStatusName: publicStatusKey
+        ? (statusByKey.get(publicStatusKey)?.name ?? publicStatusKey)
+        : null,
+    }))
 }

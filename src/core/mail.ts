@@ -556,6 +556,39 @@ export async function deliverNeedsInfoReminder(
   })
 }
 
+export interface ReleaseLetter {
+  to: string
+  postTitle: string
+  postUrl: string
+  /** Заголовок записи changelog. */
+  releaseTitle: string
+  releaseUrl: string
+  unsubscribeUrl: string
+}
+
+/**
+ * Выпуск того, о чём просили (FR-303).
+ *
+ * Отдельное письмо, а не смена статуса на «Выполнено», и разница здесь
+ * важнее формулировки. Человек голосовал год назад и с тех пор ничего
+ * не ждал; письмо, которое начинается с «то, что вы просили, вышло»,
+ * возвращает его в продукт, а «статус изменился» — сообщает о движении
+ * в чужой таблице. Это единственное письмо портала, которое приносит
+ * хорошую новость, и звучать оно должно соответственно.
+ */
+export async function deliverRelease(letter: ReleaseLetter): Promise<SendResult> {
+  return send({
+    to: letter.to,
+    subject: `Вышло: ${letter.postTitle}`,
+    text: [
+      `То, что вы просили, вышло — «${letter.postTitle}».`,
+      `Что именно изменилось: ${letter.releaseTitle}\n${letter.releaseUrl}`,
+      `Ваше обращение: ${letter.postUrl}`,
+      `\nОтписаться от обновлений этого обращения: ${letter.unsubscribeUrl}`,
+    ].join('\n\n'),
+  })
+}
+
 export async function deliverStatusChange(letter: StatusLetter): Promise<SendResult> {
   const body = [
     `Обращение «${letter.postTitle}» перешло в статус «${letter.statusName}».`,

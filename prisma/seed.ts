@@ -799,7 +799,10 @@ async function seedBacklog(
 
 async function seedChangelog(postIds: Map<string, string>, expanded: ExpandedPost[]) {
   for (const entry of changelogSeeds) {
-    const publishedAt = at(entry.agoDays)
+    const createdAt = at(entry.agoDays)
+    /* Запись со сроком — черновик: она выйдет проходом воркера (FR-166),
+       и до этого момента её нет ни в ленте релизов, ни по прямой ссылке. */
+    const scheduled = entry.scheduledInDays !== undefined
     const created = await prisma.changelogEntry.create({
       data: {
         slug: entry.slug,
@@ -810,8 +813,9 @@ async function seedChangelog(postIds: Map<string, string>, expanded: ExpandedPos
         /* Производное поле: набор типов изменений, денормализованный
            для фильтра ленты (FR-162). */
         types: [...new Set(entry.changes.map((c) => c.kind))],
-        publishedAt,
-        createdAt: publishedAt,
+        publishedAt: scheduled ? null : createdAt,
+        scheduledFor: scheduled ? at(-entry.scheduledInDays!) : null,
+        createdAt,
         changes: {
           create: entry.changes.map((c, i) => ({
             kind: c.kind,

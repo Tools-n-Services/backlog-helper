@@ -302,6 +302,40 @@ export interface ChangelogResult {
   labelFacets: FacetView[]
 }
 
+/**
+ * Запись changelog глазами команды (FR-165).
+ *
+ * Отдельный вид от публичного, потому что перед публикацией команду
+ * интересует не список изменений, а последствия: какие обращения закроются
+ * и сколько людей получит письмо. Публикация — единственное действие портала,
+ * которое рассылает хорошие новости, и единственное, которое нельзя отозвать.
+ */
+export interface ReleaseAdminView {
+  id: string
+  slug: string
+  title: string
+  version: string | null
+  /** null — ещё не опубликована. */
+  publishedLabel: string | null
+  /** Срок отложенной публикации, если задан (FR-166). */
+  scheduledLabel: string | null
+  changeCount: number
+  /** Обращения, которые закроет публикация. */
+  posts: ChangelogPostLink[]
+  /**
+   * Верхняя оценка числа писем: по одному на живую подписку связанных
+   * обращений. Настройки уведомлений часть из них отсекут.
+   */
+  letters: number
+}
+
+export interface ReleasesView {
+  /** Черновики и запланированные — то, с чем работают. */
+  pending: ReleaseAdminView[]
+  /** Последние опубликованные: подтверждение, что цикл замкнулся. */
+  published: ReleaseAdminView[]
+}
+
 /* ─────────────────────────── Профиль ─────────────────────────── */
 
 export interface ProfileView {
@@ -361,6 +395,13 @@ export interface BacklogItemDetailView extends BacklogItemView {
   /** Фазы: дочерние элементы (FR-608). */
   children: BacklogItemView[]
   parent: { id: string; title: string } | null
+  /**
+   * Публичная формулировка решения (FR-636). Уходит письмом голосовавшим,
+   * когда работа выпущена или отклонена, поэтому пишется отдельно от
+   * внутренней: «не будем, дорого» внутри и «решили сосредоточиться
+   * на другом» наружу — не одно и то же.
+   */
+  decisionReasonPublic: string | null
 }
 
 /**
@@ -520,4 +561,6 @@ export interface QueryPort {
   getBacklogItem(id: string): Promise<BacklogItemDetailView | null>
   /** В какие работы попало обращение. Видно только команде. */
   getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]>
+  /** Релизы глазами команды: что закроет публикация (FR-165). */
+  getReleases(): Promise<ReleasesView>
 }
