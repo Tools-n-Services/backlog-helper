@@ -190,7 +190,13 @@ suite('бэклог', () => {
     if (!done.ok) return
     await updateBacklogItem(done.id, { internalStatusKey: 'released' })
 
-    const query = { statusKeys: [], themeSlugs: [], kinds: [], search: TITLE_PREFIX }
+    const query = {
+      statusKeys: [],
+      themeSlugs: [],
+      kinds: [],
+      search: TITLE_PREFIX,
+      sort: 'rank' as const,
+    }
     const active = await queries.getBacklog({ ...query, includeDone: false })
     assert.ok(!active.items.some((i) => i.id === done.id))
 

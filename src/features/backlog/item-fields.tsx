@@ -1,5 +1,6 @@
 import type { InternalStatusOption, ThemeOption } from '@/core/domain/backlog/options'
 import { backlogKinds } from '@config/internal-statuses'
+import { confidences, impacts, scoreFormula } from '@config/scoring'
 import type { BacklogItemDetailView } from '@/queries/types'
 
 /**
@@ -108,8 +109,59 @@ export function ItemFields({
             />
           </Field>
 
+          {/* Компоненты приоритета. Охвата среди них нет намеренно: он
+              считается из голосов и инсайтов, а поле «Reach», которое
+              заполняют руками, показывает лишь то, во что верит
+              заполнявший (FR-612). */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Оценка">
+            <Field label="Влияние" hint={hintOf(impacts, item?.impact)}>
+              <select
+                name="impact"
+                defaultValue={item?.impact ?? ''}
+                className="h-8 w-full rounded-field border border-line bg-surface px-2 text-small text-ink-2"
+              >
+                <option value="">Не оценено</option>
+                {impacts.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Уверенность" hint={hintOf(confidences, item?.confidence)}>
+              <select
+                name="confidence"
+                defaultValue={item?.confidence ?? ''}
+                className="h-8 w-full rounded-field border border-line bg-surface px-2 text-small text-ink-2"
+              >
+                <option value="">Не оценена</option>
+                {confidences.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field
+            label="Оценка работы, недели"
+            hint={`Знаменатель формулы: ${scoreFormula.hint.toLowerCase()}`}
+          >
+            <input
+              name="effort"
+              type="number"
+              step="0.5"
+              min="0"
+              defaultValue={item?.effort ?? ''}
+              placeholder="2"
+              className="h-8 w-full rounded-field border border-line bg-surface px-2.5 text-small text-ink-2 placeholder:text-faint"
+            />
+          </Field>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Размер">
               <input
                 name="estimate"
                 defaultValue={item?.estimate ?? ''}
@@ -146,6 +198,14 @@ function hintFor(statuses: InternalStatusOption[], key: string | null | undefine
   return stage.publicStatusName
     ? `${stage.hint}. Связанные обращения показывают «${stage.publicStatusName}»`
     : `${stage.hint}. Пользователю этот этап не виден`
+}
+
+/** Пояснение к выбранной оценке: словами, а не числом множителя. */
+function hintOf(
+  options: { value: number; name: string; hint: string }[],
+  value: number | null | undefined,
+) {
+  return options.find((o) => o.value === value)?.hint
 }
 
 function Field({

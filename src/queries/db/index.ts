@@ -19,7 +19,9 @@ import { backlogKinds, backlogKindName, internalStatuses, internalStatusByKey } 
 import { severities } from '@config/scoring'
 import type { Privacy } from '@config/post-types'
 import type { BacklogKind } from '@/generated/prisma/enums'
+import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/core/db'
+import { insightSourceName } from '@/core/domain/backlog/insights'
 import { autoPriority } from '@/core/domain/triage/priority'
 import { slaState } from '@/core/domain/triage/sla'
 import {
@@ -873,8 +875,21 @@ export const dbQueries: QueryPort = {
         : {}),
     }
 
+    /* Ручной порядок — основной (FR-615). Сортировки по расчёту ставят
+       неоценённое в конец: null означает «нечем считать», и место в хвосте
+       здесь честнее нуля — работу надо оценить, а не задвинуть. */
+    const orderBy =
+      query.sort === 'score'
+        ? [{ score: { sort: 'desc' as const, nulls: 'last' as const } }, { rank: 'asc' as const }]
+        : query.sort === 'mrr'
+          ? [
+              { mrrSum: { sort: 'desc' as const, nulls: 'last' as const } },
+              { rank: 'asc' as const },
+            ]
+          : [{ rank: 'asc' as const }]
+
     const [rows, total, themes, allItems] = await Promise.all([
-      prisma.backlogItem.findMany({ where, orderBy: { rank: 'asc' }, select: backlogSelect }),
+      prisma.backlogItem.findMany({ where, orderBy, select: backlogSelect }),
       prisma.backlogItem.count({ where }),
       prisma.theme.findMany({
         orderBy: { name: 'asc' },
@@ -920,6 +935,21 @@ export const dbQueries: QueryPort = {
       select: {
         ...backlogSelect,
         decisionReasonPublic: true,
+        impact: true,
+        confidence: true,
+        effort: true,
+        insights: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            quote: true,
+            source: true,
+            sourceUrl: true,
+            createdAt: true,
+            author: { select: { name: true } },
+            company: { select: { id: true, name: true, monthlySpend: true } },
+          },
+        },
         parent: { select: { id: true, title: true } },
         children: { orderBy: { rank: 'asc' }, select: backlogSelect },
         posts: {
@@ -942,10 +972,38 @@ export const dbQueries: QueryPort = {
     if (!row) return null
 
     const now = new Date()
+    const insights = row.insights.map((i) => ({
+      id: i.id,
+      quote: i.quote,
+      sourceName: insightSourceName(i.source),
+      sourceUrl: i.sourceUrl,
+      authorName: i.author?.name ?? null,
+      companyName: i.company?.name ?? null,
+      companyMrr: i.company?.monthlySpend === undefined ? null : decimal(i.company.monthlySpend),
+      createdLabel: relativeLabel(i.createdAt, now),
+    }))
+
+    /* Деньги считаются по УНИКАЛЬНЫМ компаниям: три цитаты от одного
+       клиента — это по-прежнему один клиент и одна сумма (FR-623). */
+    const companies = new Map<string, number | null>()
+    for (const i of row.insights) {
+      if (i.company) companies.set(i.company.id, decimal(i.company.monthlySpend))
+    }
+    const money = [...companies.values()].filter((v): v is number => v !== null)
+
     return {
       ...toBacklogItemView(row, now),
       parent: row.parent,
       decisionReasonPublic: row.decisionReasonPublic,
+      impact: decimal(row.impact),
+      confidence: decimal(row.confidence),
+      effort: decimal(row.effort),
+      insights,
+      insightSummary: {
+        quotes: insights.length,
+        companies: companies.size,
+        mrr: money.length > 0 ? money.reduce((sum, v) => sum + v, 0) : null,
+      },
       children: row.children.map((c) => toBacklogItemView(c, now)),
       posts: row.posts
         .map(({ post }) => ({
@@ -1110,10 +1168,13 @@ const backlogSelect = {
   internalStatus: { select: { key: true } },
   owner: { select: { name: true } },
   /* Голоса связанных обращений — грубая оценка спроса. Настоящий охват
-     с дедупликацией по человеку считает джоба (FR-612), и он появится
-     отдельным полем: сумма голосов завышает ровно на тех, кто голосовал
-     за несколько связанных обращений. */
+     считается с дедупликацией по человеку и лежит в `reach` (FR-612):
+     сумма голосов завышает ровно на тех, кто голосовал за несколько
+     связанных обращений. */
   posts: { select: { post: { select: { voteCount: true } } } },
+  reach: true,
+  mrrSum: true,
+  score: true,
 } as const
 
 type BacklogRow = {
@@ -1129,6 +1190,9 @@ type BacklogRow = {
   internalStatus: { key: string } | null
   owner: { name: string } | null
   posts: { post: { voteCount: number } }[]
+  reach: number
+  mrrSum: Prisma.Decimal | null
+  score: Prisma.Decimal | null
 }
 
 function toBacklogItemView(row: BacklogRow, now: Date): BacklogItemView {
@@ -1148,8 +1212,16 @@ function toBacklogItemView(row: BacklogRow, now: Date): BacklogItemView {
     targetRelease: row.targetRelease,
     postCount: row.posts.length,
     voteCount: row.posts.reduce((sum, p) => sum + p.post.voteCount, 0),
+    reach: row.reach,
+    mrrSum: decimal(row.mrrSum),
+    score: decimal(row.score),
     updatedLabel: relativeLabel(row.updatedAt ?? row.createdAt, now),
   }
+}
+
+/** Decimal наружу не отдаётся: экран получает число, а не объект драйвера. */
+function decimal(value: Prisma.Decimal | null): number | null {
+  return value === null ? null : Number(value)
 }
 
 const CHANGE_KIND_NAMES: Record<ChangeKind, string> = {

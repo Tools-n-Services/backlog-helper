@@ -45,6 +45,7 @@ import {
   type ExpandedComment,
   type ExpandedPost,
 } from '@config/seed'
+import { recalculateBacklogScores } from '@/core/domain/backlog/scoring'
 import { trendScore } from '@/core/domain/shared/trending'
 import { slaDueAt } from '@/core/domain/triage/sla'
 import { slugify } from '@/core/slug'
@@ -690,6 +691,21 @@ async function seedBacklog(
     posts: string[]
     estimate?: string
     targetRelease?: string
+    /* Оценки для формулы приоритета. Охвата здесь нет: он считается
+       из голосов и инсайтов (FR-612), и подставить его сидом значило бы
+       показать в демонстрации ровно тот самообман, от которого
+       приоритизация защищает. */
+    impact?: number
+    confidence?: number
+    effort?: number
+    /* Цитаты из-за пределов портала (FR-621). Enterprise-клиент почти
+       никогда не идёт голосовать — он говорит это своему менеджеру,
+       и без инсайтов его вес в приоритете равен нулю. */
+    insights?: {
+      quote: string
+      source: 'call' | 'ticket' | 'chat' | 'interview' | 'sales' | 'other'
+      company?: string
+    }[]
   }[] = [
     {
       /* Внутренняя формулировка отличается от публичной намеренно: в бэклоге
@@ -709,6 +725,23 @@ async function seedBacklog(
         'Учёт производственного календаря при копировании',
         'Копирование недели дублирует отпуска',
       ],
+      impact: 2,
+      confidence: 1,
+      effort: 3,
+      insights: [
+        {
+          quote:
+            'Мы держим отдельного человека три дня в месяц только на то, чтобы разложить шаблон по неделям. Это дороже, чем ваша подписка.',
+          source: 'call',
+          company: 'Сеть «Восход»',
+        },
+        {
+          quote:
+            'Если бы копирование учитывало праздники, мы бы перестали проверять январь вручную.',
+          source: 'interview',
+          company: 'Полдень',
+        },
+      ],
     },
     {
       title: 'Разбивка часов по видам при выгрузке',
@@ -721,6 +754,17 @@ async function seedBacklog(
       posts: [
         'Сводка по часам с разбивкой на дневные, ночные и праздничные',
         'Итог по часам в файле не сходится с итогом на экране',
+      ],
+      impact: 3,
+      confidence: 0.8,
+      effort: 2,
+      insights: [
+        {
+          quote:
+            'Бухгалтерия считает надбавки за ночные вручную по каждому филиалу. В марте из-за этого пересчитывали зарплату двадцати восьми людям.',
+          source: 'ticket',
+          company: 'Сеть «Восход»',
+        },
       ],
     },
     {
@@ -735,6 +779,9 @@ async function seedBacklog(
         'Экспорт графика в Excel теряет ночные смены',
         'Ночная смена отображается в неправильном дне недели',
       ],
+      impact: 2,
+      confidence: 1,
+      effort: 1,
     },
     {
       title: 'Промежуточная роль между сотрудником и управляющим',
@@ -756,6 +803,12 @@ async function seedBacklog(
       status: 'inbox',
       estimate: '4 недели',
       posts: [],
+      /* Оценки есть, а расчётного приоритета не будет: охват нулевой,
+         и RICE про такую работу сказать нечего. Место в бэклоге ей задаёт
+         ручной ранг — так и должно быть (FR-615). */
+      impact: 1,
+      confidence: 1,
+      effort: 4,
     },
     {
       title: 'Хранение диагностики не дольше срока retention',
@@ -767,6 +820,9 @@ async function seedBacklog(
       posts: [],
     },
   ]
+
+  const companies = await prisma.company.findMany({ select: { id: true, name: true } })
+  const companyByName = new Map(companies.map((c) => [c.name, c.id]))
 
   let rank = 1000
   for (const item of items) {
@@ -780,6 +836,9 @@ async function seedBacklog(
         ownerId: ids.users.team[0] ?? null,
         estimate: item.estimate ?? null,
         targetRelease: item.targetRelease ?? null,
+        impact: item.impact ?? null,
+        confidence: item.confidence ?? null,
+        effort: item.effort ?? null,
         /* Дробная индексация: шаг в тысячу оставляет место между соседями
            для перетаскивания без пересчёта всей таблицы. */
         rank,
@@ -792,7 +851,24 @@ async function seedBacklog(
       return postId ? [{ backlogItemId: created.id, postId }] : []
     })
     if (links.length) await prisma.backlogPost.createMany({ data: links })
+
+    for (const insight of item.insights ?? []) {
+      await prisma.insight.create({
+        data: {
+          backlogItemId: created.id,
+          quote: insight.quote,
+          source: insight.source,
+          companyId: insight.company ? (companyByName.get(insight.company) ?? null) : null,
+        },
+      })
+    }
   }
+
+  /* Числа считаются тем же кодом, что и в работе портала, а не проставляются
+     сидом. Захардкоженный охват в демонстрации — это ровно тот самообман,
+     против которого написан FR-612: он не сойдётся с фактами при первом
+     же пересчёте, и объяснить расхождение будет нечем. */
+  await recalculateBacklogScores()
 
   return items.length
 }

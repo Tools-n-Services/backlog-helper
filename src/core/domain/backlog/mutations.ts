@@ -12,6 +12,7 @@
 
 import { defaultInternalStatus } from '@config/internal-statuses'
 import { prisma } from '@/core/db'
+import { recalculateBacklogScores } from './scoring'
 import { applyInternalStatus, type PublicEffect } from './status-flow'
 
 /** Шаг ранга при добавлении в конец: место между соседями для перетаскивания. */
@@ -125,6 +126,13 @@ export interface UpdateBacklogItemInput {
   decisionReasonPublic?: string | null
   /** Кто меняет: попадает в историю статусов обращений. */
   actorId?: string | null
+  /**
+   * Оценки для формулы приоритета (FR-611). Охвата здесь нет намеренно:
+   * он считается из голосов и инсайтов, а не вводится (FR-612).
+   */
+  impact?: number | null
+  confidence?: number | null
+  effort?: number | null
 }
 
 export async function updateBacklogItem(
@@ -196,8 +204,22 @@ export async function updateBacklogItem(
       ...(input.decisionReasonPublic !== undefined
         ? { decisionReasonPublic: reason }
         : {}),
+      ...(input.impact !== undefined ? { impact: input.impact } : {}),
+      ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+      ...(input.effort !== undefined ? { effort: input.effort } : {}),
     },
   })
+
+  /* Оценки поменялись — приоритет обязан поменяться в том же сохранении:
+     число, которое догонит форму через шесть часов, никто не свяжет
+     со своей правкой и посчитает сломанным. */
+  if (
+    input.impact !== undefined ||
+    input.confidence !== undefined ||
+    input.effort !== undefined
+  ) {
+    await recalculateBacklogScores(id)
+  }
 
   return publicEffect ? { ok: true, id, publicEffect } : { ok: true, id }
 }
@@ -214,6 +236,9 @@ export async function linkPosts(itemId: string, postIds: string[]): Promise<numb
     data: postIds.map((postId) => ({ backlogItemId: itemId, postId })),
     skipDuplicates: true,
   })
+  /* Спрос у работы изменился — охват и приоритет тоже. Считаем сразу:
+     привязку делают ради того, чтобы увидеть новое число. */
+  if (result.count > 0) await recalculateBacklogScores(itemId)
   return result.count
 }
 
@@ -221,6 +246,7 @@ export async function unlinkPost(itemId: string, postId: string): Promise<void> 
   await prisma.backlogPost.deleteMany({
     where: { backlogItemId: itemId, postId },
   })
+  await recalculateBacklogScores(itemId)
 }
 
 /**

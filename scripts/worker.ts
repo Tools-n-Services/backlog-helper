@@ -16,6 +16,7 @@
  */
 
 import { prisma } from '@/core/db'
+import { recalculateBacklogScores } from '@/core/domain/backlog/scoring'
 import { publishScheduled } from '@/core/domain/changelog/releases'
 import {
   recalculateAffected,
@@ -29,7 +30,14 @@ import {
 } from '@/core/domain/post/notifications'
 import { processStaleNeedsInfo } from '@/core/domain/triage/needs-info'
 
-type JobName = 'releases' | 'mail' | 'needs-info' | 'trending' | 'affected' | 'reconcile'
+type JobName =
+  | 'releases'
+  | 'mail'
+  | 'needs-info'
+  | 'trending'
+  | 'affected'
+  | 'backlog'
+  | 'reconcile'
 
 interface Job {
   name: JobName
@@ -114,6 +122,18 @@ const JOBS: Job[] = [
     run: async () => {
       const { updated } = await recalculateAffected()
       return updated === 0 ? null : `обновлено обращений: ${updated}`
+    },
+  },
+  {
+    name: 'backlog',
+    what: 'охват и приоритет бэклога',
+    /* Реже рассылки и чаще сверки: числа меняются с каждым голосом, но
+       решение по ним принимают не поминутно. Правки, сделанные руками
+       в карточке, пересчитываются сразу — здесь только фон. */
+    everyMs: 6 * HOUR,
+    run: async () => {
+      const { updated } = await recalculateBacklogScores()
+      return updated === 0 ? null : `обновлено работ: ${updated}`
     },
   },
   {

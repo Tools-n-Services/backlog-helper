@@ -3,15 +3,18 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { scoreFormula } from '@config/scoring'
 import { formatCount, plural } from '@/core/content'
+import { insightSources, listCompanies } from '@/core/domain/backlog/insights'
 import { listInternalStatuses, listThemes } from '@/core/domain/backlog/options'
 import { can } from '@/core/permissions'
 import { getViewer } from '@/core/session'
 import { createItemAction, updateItemAction } from '@/features/backlog/actions'
+import { Insights } from '@/features/backlog/insights'
 import { ItemFields } from '@/features/backlog/item-fields'
 import { LinkedPosts } from '@/features/backlog/link-posts'
 import { queries } from '@/queries'
-import type { BacklogItemView } from '@/queries/types'
+import type { BacklogItemDetailView, BacklogItemView } from '@/queries/types'
 import { PrimaryAction, StateScreen } from '@/ui/layout/state-screen'
 
 export async function generateMetadata({
@@ -45,7 +48,11 @@ export default async function BacklogItemPage({
   }
 
   const { id } = await params
-  const [item, themes] = await Promise.all([queries.getBacklogItem(id), listThemes()])
+  const [item, themes, companies] = await Promise.all([
+    queries.getBacklogItem(id),
+    listThemes(),
+    listCompanies(),
+  ])
   if (!item) notFound()
 
   const statuses = listInternalStatuses()
@@ -86,6 +93,13 @@ export default async function BacklogItemPage({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-8">
           <LinkedPosts itemId={item.id} posts={item.posts} />
+          <Insights
+            itemId={item.id}
+            insights={item.insights}
+            summary={item.insightSummary}
+            companies={companies}
+            sources={insightSources}
+          />
           <Phases item={item} />
         </div>
 
@@ -101,16 +115,62 @@ export default async function BacklogItemPage({
             </button>
           </form>
 
-          <p className="mt-3 text-small text-faint">
-            {/* Итог спроса рядом с формой: он и есть основной аргумент
-                в разговоре о приоритете. */}
-            {item.postCount > 0
-              ? `${formatCount(item.postCount)} ${plural(item.postCount, ['обращение', 'обращения', 'обращений'])}, ${formatCount(item.voteCount)} ${plural(item.voteCount, ['голос', 'голоса', 'голосов'])}`
-              : 'Обращений нет — приоритет решается без цифр спроса'}
-          </p>
+          <Demand item={item} />
         </aside>
       </div>
     </div>
+  )
+}
+
+/**
+ * Спрос и приоритет — рядом с формой оценок.
+ *
+ * Охват стоит отдельной строкой от суммы голосов намеренно: они почти всегда
+ * расходятся, и расхождение — это и есть ответ на вопрос «сколько тут разных
+ * людей». Сумма голосов по четырём связанным обращениям считает одного
+ * человека четырежды, охват — один раз и с весом его сегмента (FR-612).
+ */
+function Demand({ item }: { item: BacklogItemDetailView }) {
+  const rows: { label: string; value: string; hint?: string }[] = [
+    {
+      label: 'Обращений',
+      value:
+        item.postCount > 0
+          ? `${formatCount(item.postCount)} · ${formatCount(item.voteCount)} ${plural(item.voteCount, ['голос', 'голоса', 'голосов'])}`
+          : '—',
+    },
+    {
+      label: 'Охват',
+      value: item.reach > 0 ? formatCount(item.reach) : '—',
+      hint: 'уникальные люди с весом сегмента',
+    },
+    {
+      label: 'Деньги',
+      value: item.mrrSum === null ? '—' : `${formatCount(Math.round(item.mrrSum))} ₽`,
+      hint: 'MRR затронутых компаний',
+    },
+    {
+      label: scoreFormula.name,
+      value:
+        item.score === null
+          ? 'нет оценки'
+          : item.score >= 100
+            ? formatCount(Math.round(item.score))
+            : item.score.toFixed(1),
+      hint: scoreFormula.hint.toLowerCase(),
+    },
+  ]
+
+  return (
+    <dl className="mt-4 divide-y divide-line rounded-card border border-line bg-surface">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-baseline gap-3 px-3 py-1.5">
+          <dt className="text-small text-muted">{row.label}</dt>
+          {row.hint && <dd className="text-small text-faint">{row.hint}</dd>}
+          <dd className="tnum ml-auto text-small font-semibold text-ink">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

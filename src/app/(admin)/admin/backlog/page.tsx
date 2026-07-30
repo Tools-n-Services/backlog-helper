@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
 
+import { scoreFormula } from '@config/scoring'
 import { formatCount, plural } from '@/core/content'
 import { can } from '@/core/permissions'
 import { getViewer } from '@/core/session'
 import { queries } from '@/queries'
-import type { BacklogItemView } from '@/queries/types'
+import type { BacklogItemView, BacklogSort } from '@/queries/types'
 import { PrimaryAction, StateScreen } from '@/ui/layout/state-screen'
 
 export const metadata: Metadata = { title: 'Бэклог', robots: { index: false } }
@@ -44,12 +45,17 @@ export default async function BacklogPage({
     return (Array.isArray(value) ? value : [value]).flatMap((v) => v.split(','))
   }
 
+  const sortParam = one('sort')
+  const sort: BacklogSort =
+    sortParam === 'score' || sortParam === 'mrr' ? sortParam : 'rank'
+
   const query = {
     statusKeys: many('status'),
     themeSlugs: many('theme'),
     kinds: many('kind'),
     search: one('q') ?? '',
     includeDone: one('done') === '1',
+    sort,
   }
   const backlog = await queries.getBacklog(query)
 
@@ -80,10 +86,29 @@ export default async function BacklogPage({
           values={backlog.themes.map((t) => ({ key: t.slug, name: t.name, count: t.count }))}
           params={params}
         />
+        {/* Порядок — ручной по умолчанию: расчёт остаётся подсказкой,
+            а решение принимают люди (FR-615). */}
+        <span className="ml-auto flex items-center gap-1.5">
+          <span className="text-faint">Порядок</span>
+          {SORTS.map((option) => (
+            <Link
+              key={option.key}
+              href={setParam(params, 'sort', option.key === 'rank' ? null : option.key)}
+              title={option.hint}
+              className={
+                'rounded-field px-2 py-0.5 ' +
+                (sort === option.key ? 'bg-ink text-surface' : 'text-ink-2 hover:bg-track')
+              }
+            >
+              {option.name}
+            </Link>
+          ))}
+        </span>
+
         <Link
           href={toggleParam(params, 'done', '1')}
           className={
-            'ml-auto rounded-field px-2 py-0.5 ' +
+            'rounded-field px-2 py-0.5 ' +
             (query.includeDone ? 'bg-ink text-surface' : 'text-muted hover:bg-track')
           }
         >
@@ -137,11 +162,31 @@ function ItemRow({ item }: { item: BacklogItemView }) {
           : '—'}
       </span>
 
+      {/* Охват и приоритет — рядом и в одной шкале: score без охвата
+          не объяснить, а охват без score не сравнить. */}
+      <span className="tnum w-20 shrink-0 text-right text-small text-muted">
+        {item.reach > 0 ? formatCount(item.reach) : '—'}
+      </span>
+      <span className="tnum w-16 shrink-0 text-right text-small font-semibold text-ink">
+        {item.score === null ? '—' : formatScore(item.score)}
+      </span>
+
       <span className="w-24 shrink-0 text-right text-small text-faint">
         {item.targetRelease ?? item.estimate ?? ''}
       </span>
     </Link>
   )
+}
+
+const SORTS: { key: BacklogSort; name: string; hint: string }[] = [
+  { key: 'rank', name: 'ручной', hint: 'Порядок, который задала команда' },
+  { key: 'score', name: scoreFormula.name, hint: scoreFormula.hint },
+  { key: 'mrr', name: 'деньги', hint: 'Сумма MRR затронутых компаний' },
+]
+
+/** Приоритет — с одним знаком: вторая цифра после запятой ничего не решает. */
+function formatScore(score: number): string {
+  return score >= 100 ? formatCount(Math.round(score)) : score.toFixed(1)
 }
 
 function Facets({
@@ -181,6 +226,23 @@ function Facets({
       ))}
     </span>
   )
+}
+
+/** Ставит одиночное значение в адресе; null убирает его совсем. */
+function setParam(
+  params: Record<string, string | string[] | undefined>,
+  key: string,
+  value: string | null,
+): Route {
+  const next = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || k === key) continue
+    for (const item of Array.isArray(v) ? v : [v]) next.append(k, item)
+  }
+  if (value !== null) next.set(key, value)
+
+  const qs = next.toString()
+  return (qs ? `/admin/backlog?${qs}` : '/admin/backlog') as Route
 }
 
 /** Переключает значение фильтра в адресе, сохраняя остальные. */

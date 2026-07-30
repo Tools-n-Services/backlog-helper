@@ -374,6 +374,16 @@ export interface BacklogItemView {
   postCount: number
   /** Суммарные голоса связанных обращений — грубая оценка спроса. */
   voteCount: number
+  /**
+   * Уникальные затронутые с весами сегментов (FR-612). Считается, а не
+   * вводится: отличается от суммы голосов ровно на тех, кто голосовал
+   * за несколько связанных обращений.
+   */
+  reach: number
+  /** Сумма monthly_spend затронутых компаний (FR-613). */
+  mrrSum: number | null
+  /** Расчётный приоритет. null — нечем считать: нет оценок. */
+  score: number | null
   updatedLabel: string
 }
 
@@ -389,9 +399,41 @@ export interface BacklogPostLink {
   countLabel: [string, string, string]
 }
 
+/**
+ * Цитата из источника вне портала (FR-621).
+ *
+ * Дословно, а не пересказом: на встрече о приоритете пересказ ничего
+ * не доказывает, а фраза клиента — доказывает.
+ */
+export interface InsightView {
+  id: string
+  quote: string
+  sourceName: string
+  sourceUrl: string | null
+  authorName: string | null
+  companyName: string | null
+  /** Деньги компании, из которой пришла цитата. */
+  companyMrr: number | null
+  createdLabel: string
+}
+
+/** Итог по цитатам: «12 цитат от 9 компаний, суммарно 18 000 ₽» (FR-623). */
+export interface InsightSummary {
+  quotes: number
+  companies: number
+  mrr: number | null
+}
+
 export interface BacklogItemDetailView extends BacklogItemView {
   /** Обращения, которые закроет эта работа (FR-602). */
   posts: BacklogPostLink[]
+  /** Цитаты, привязанные к работе (FR-621). */
+  insights: InsightView[]
+  insightSummary: InsightSummary
+  /** Компоненты формулы приоритета. Охват среди них не значится: он считается. */
+  impact: number | null
+  confidence: number | null
+  effort: number | null
   /** Фазы: дочерние элементы (FR-608). */
   children: BacklogItemView[]
   parent: { id: string; title: string } | null
@@ -424,6 +466,15 @@ export interface BacklogColumnView {
   items: BacklogItemView[]
 }
 
+/**
+ * Порядок бэклога.
+ *
+ * `rank` — ручной, и он по умолчанию: расчётный приоритет остаётся подсказкой,
+ * а решение принимают люди (FR-615). Сортировки по score и деньгам — способ
+ * посмотреть на список другим взглядом, а не приговор.
+ */
+export type BacklogSort = 'rank' | 'score' | 'mrr'
+
 export interface BacklogQuery {
   /** Ключ внутреннего статуса; пусто — все активные. */
   statusKeys: string[]
@@ -432,6 +483,7 @@ export interface BacklogQuery {
   search: string
   /** Показывать завершённые: по умолчанию бэклог про предстоящее. */
   includeDone: boolean
+  sort: BacklogSort
 }
 
 export interface BacklogView {

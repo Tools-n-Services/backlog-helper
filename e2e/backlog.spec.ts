@@ -71,6 +71,27 @@ test.describe('от имени команды', () => {
     await expect(page.getByRole('link', { name: new RegExp(escape(workTitle)) })).toBeVisible()
   })
 
+  test('цитата добавляется в карточку и меняет охват', async ({ page }) => {
+    await page.goto('/admin/backlog')
+    await page.locator('main ul > li a').first().click()
+
+    const reachBefore = await page.getByText('уникальные люди').locator('..').innerText()
+
+    /* Добавление должно занимать секунды: форма открыта сразу, обязательное
+       поле одно — сама цитата (FR-622). */
+    await page
+      .getByPlaceholder('Вставьте фразу целиком')
+      .fill('Проверка e2e: без этого мы не сможем продлить контракт.')
+    await page.getByRole('button', { name: 'Добавить' }).first().click()
+
+    await expect(page.getByText('Проверка e2e: без этого мы')).toBeVisible()
+    /* Охват пересчитывается сразу: цитату добавляют ради того, чтобы
+       увидеть, как она меняет приоритет. */
+    await expect
+      .poll(async () => page.getByText('уникальные люди').locator('..').innerText())
+      .not.toBe(reachBefore)
+  })
+
   test('этап работы двигает публичный статус связанного обращения', async ({ page }) => {
     /* То, ради чего продукт существует (FR-632): человек проголосовал
        и узнаёт судьбу запроса, ничего для этого не делая. */
