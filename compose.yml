@@ -1,0 +1,118 @@
+# Развёртывание портала (В6, docs/09-install.md).
+#
+# Один продукт — один compose: своя база, свой домен, свои переменные.
+# Второй продукт на том же сервере — копия этого файла с другим доменом
+# и другим именем проекта (docker compose -p второй-портал up -d).
+#
+# Запуск:
+#   cp .env.example .env   и заполните PORTAL_DOMAIN, INSTALL_TOKEN, почту
+#   docker compose up -d
+#   откройте https://ваш-домен/install/enter?token=…
+
+name: backlog-helper
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: backlog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте пароль базы в .env}
+      POSTGRES_DB: backlog
+      # Локаль C.UTF-8 обязательна: от неё зависит поиск по кириллице
+      # и работа pg_trgm. Кластер инициализируется один раз — сменить
+      # локаль потом можно только пересозданием базы.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C.UTF-8'
+      TZ: UTC
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U backlog -d backlog']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ROLE: app
+      DATABASE_URL: postgresql://backlog:${POSTGRES_PASSWORD}@db:5432/backlog
+      PORTAL_ORIGIN: https://${PORTAL_DOMAIN:?задайте домен портала в .env}
+      INSTALL_TOKEN: ${INSTALL_TOKEN:?задайте токен установки в .env}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-file}
+      MAIL_FROM: ${MAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      UNISENDER_API_KEY: ${UNISENDER_API_KEY:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-file}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      TRANSLATE_PROVIDER: ${TRANSLATE_PROVIDER:-off}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Вложения при STORAGE_PROVIDER=file. Для нескольких инстансов
+      # нужен S3: том не переживёт вторую копию приложения.
+      - uploads:/app/.data/uploads
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      app:
+        # После app: миграции применяет он, и воркеру незачем стартовать
+        # раньше, чем схема окажется на месте.
+        condition: service_healthy
+    environment:
+      ROLE: worker
+      DATABASE_URL: postgresql://backlog:${POSTGRES_PASSWORD}@db:5432/backlog
+      PORTAL_ORIGIN: https://${PORTAL_DOMAIN}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-file}
+      MAIL_FROM: ${MAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      UNISENDER_API_KEY: ${UNISENDER_API_KEY:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-file}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      TRANSLATE_PROVIDER: ${TRANSLATE_PROVIDER:-off}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - uploads:/app/.data/uploads
+
+  proxy:
+    # Caddy сам выписывает и продлевает сертификат: домен указывается одной
+    # строкой, и это единственное место, где он вообще упоминается снаружи.
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db:
+  uploads:
+  caddy-data:
+  caddy-config:
