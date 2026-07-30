@@ -25,6 +25,7 @@
  */
 
 import { prisma } from '@/core/db'
+import { loadSettings } from '@/core/settings'
 import type { FormField, Privacy } from '@config/post-types'
 import type { StatusShape } from '@config/statuses'
 
@@ -117,13 +118,22 @@ let loadedAt = 0
 /** Загрузка в полёте: десять параллельных запросов не должны дать десять выборок. */
 let inFlight: Promise<Catalog> | null = null
 
-/** Загрузить справочники, если снимок устарел. Дёшево при попадании в кеш. */
+/**
+ * Загрузить справочники, если снимок устарел. Дёшево при попадании в кеш.
+ *
+ * Настройки грузятся здесь же: у них та же природа и то же время жизни,
+ * а две точки входа означали бы, что где-то забудут вторую.
+ */
 export async function loadCatalog(): Promise<Catalog> {
   const fresh = snapshot && Date.now() - loadedAt < TTL_MS
-  if (fresh) return snapshot!
+  if (fresh) {
+    await loadSettings()
+    return snapshot!
+  }
   if (inFlight) return inFlight
 
-  inFlight = read()
+  inFlight = Promise.all([read(), loadSettings()])
+    .then(([next]) => next)
     .then((next) => {
       snapshot = next
       loadedAt = Date.now()

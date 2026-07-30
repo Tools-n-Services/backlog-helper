@@ -12,7 +12,7 @@
  * перезапускаться и отставать — статус от этого не страдает.
  */
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import { deliverRelease, deliverReply, deliverStatusChange } from '@/core/mail'
@@ -308,5 +308,5 @@ export async function unsubscribeByToken(token: string): Promise<UnsubscribeResu
  * ссылка в письме — единственный путь обратно на портал.
  */
 export function portalOrigin(): string {
-  return process.env.PORTAL_ORIGIN ?? `https://${product.domain}`
+  return process.env.PORTAL_ORIGIN ?? `https://${settings().domain}`
 }

@@ -21,6 +21,16 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Настройки портала: то, что правится без пересборки (В2, docs/09-install.md).
+/// Значение по ключу; отсутствие строки означает «взять дефолт пресета».
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("setting")
+}
+
 /* ─────────────────────────── Перечисления ─────────────────────────── */
 
 enum BoardVisibility {
@@ -215,8 +225,9 @@ model Status {
   key           String    @unique
   name          String
   nameEn        String?   @map("name_en")
-  /// Токен темы, не hex — см. правила форка.
-  color         String    @default("")
+  /// Имя записи палитры (`slate`, `amber`, …), не hex: набор конечен,
+  /// контраст в нём проверен, и статус из админки не остаётся без цвета.
+  color         String    @default("gray")
   /// Форма маркера: второй канал кодирования помимо цвета (07-ui-brief.md).
   shape         String    @default("dot")
   position      Int

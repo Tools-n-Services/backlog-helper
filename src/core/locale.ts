@@ -9,13 +9,14 @@ import {
   type Dictionary,
   type Locale,
 } from '@/core/content'
+import { loadSettings } from '@/core/settings'
 
 /**
  * Язык этого запроса (FR-181).
  *
  * Только для сервера: читает куку и заголовок браузера. Порядок выбора —
  * кука (человек переключил руками) → Accept-Language (пришёл впервые) →
- * язык продукта из конфига. Кука выше браузера намеренно: человек
+ * язык портала из настроек. Кука выше браузера намеренно: человек
  * с английской системой, выбравший русский, не должен получать английский
  * после каждого перехода.
  *
@@ -27,7 +28,8 @@ export const locale = cache(async (): Promise<Locale> => {
   if (isLocale(chosen)) return chosen
 
   const accepted = (await headers()).get('accept-language') ?? ''
-  return preferredLocale(accepted)
+  /* Язык портала — из настроек: его выбирают в мастере, а не пересборкой. */
+  return preferredLocale(accepted, (await loadSettings()).locale)
 })
 
 /** Словарь текущего запроса. */

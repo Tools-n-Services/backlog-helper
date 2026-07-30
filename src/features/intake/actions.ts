@@ -1,6 +1,6 @@
 'use server'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { catalog, loadCatalog } from '@/core/catalog'
 import { prisma } from '@/core/db'
 import {
@@ -126,8 +126,8 @@ export async function submitPost(
     recent.map((p) => p.createdAt.getTime()),
     now,
     {
-      postsPerHour: product.limits.postsPerHour,
-      postsPerDay: product.limits.postsPerDay,
+      postsPerHour: settings().limits.postsPerHour,
+      postsPerDay: settings().limits.postsPerDay,
     },
   )
   if (!verdict.allowed) {

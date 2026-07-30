@@ -11,7 +11,7 @@
  * к базе там, где хватает одного.
  */
 
-import { product } from '@config/product'
+import { loadSettings, settings } from '@/core/settings'
 import { prisma } from '@/core/db'
 
 /* ────────────────────────── Trending ──────────────────────────── */
@@ -39,7 +39,8 @@ export interface TrendingResult {
  * когда-то, — и держится в «Популярном» уже без всякой популярности.
  */
 export async function recalculateTrending(): Promise<TrendingResult> {
-  const halfLife = product.trendingHalfLifeDays
+  await loadSettings()
+  const halfLife = settings().trendingHalfLifeDays
   const horizonDays = halfLife * 3
 
   const updated = await prisma.$executeRawUnsafe(

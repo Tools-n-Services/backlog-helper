@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-import { product } from '@config/product'
+import { loadSettings } from '@/core/settings'
 import { content } from '@/core/locale'
 import { requestMagicLink } from '@/features/session/actions'
 
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * ещё один пароль, а забытый пароль стоит команде обращения в поддержку.
  */
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
-  const [params, t] = await Promise.all([searchParams, content()])
+  const [params, t, site] = await Promise.all([searchParams, content(), loadSettings()])
   const errors: Record<string, string> = {
     'invalid-email': t.auth.errorInvalidEmail,
     'rate-limited': t.auth.errorRateLimited,
@@ -33,9 +33,9 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       <div className="mx-auto max-w-[38rem]">
         <div className="mb-8 flex items-center gap-2.5">
           <span className="flex size-7 items-center justify-center rounded-pill bg-ink text-[12px] font-bold text-surface">
-            {product.mark}
+            {site.mark}
           </span>
-          <span className="text-body font-semibold text-ink">{product.name}</span>
+          <span className="text-body font-semibold text-ink">{site.name}</span>
         </div>
 
         <h1 className="text-h1 font-light text-ink md:text-display">
@@ -69,7 +69,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
             /* Адрес возвращается в поле: заставлять набирать его заново
                после отказа — верный способ получить вторую опечатку. */
             defaultValue={first('email') ?? ''}
-            placeholder={`${t.auth.emailPlaceholderName}@${product.domain}`}
+            placeholder={`${t.auth.emailPlaceholderName}@${site.domain}`}
             className="w-full rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2 placeholder:text-faint"
           />
           <button

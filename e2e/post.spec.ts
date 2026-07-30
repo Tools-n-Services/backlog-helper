@@ -7,6 +7,12 @@ import { stateFor } from './global-setup'
    в states.spec.ts. */
 test.use({ storageState: stateFor('user') })
 
+/* Один поток на файл: голос — свойство пары (обращение, человек), а все
+   сценарии здесь голосуют за одно и то же обращение от одного и того же
+   участника. Параллельно они меняют счётчик друг у друга под руками —
+   и падает то один, то другой, в зависимости от того, кто успел раньше. */
+test.describe.configure({ mode: 'serial' })
+
 const FLAGSHIP_PATH = '/bugs/p/eksport-grafika-v-excel-teryaet-nochnye-smeny'
 const FLAGSHIP = FLAGSHIP_PATH
 

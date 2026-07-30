@@ -73,12 +73,18 @@ export function isLocale(value: string | undefined | null): value is Locale {
  * Разбор нарочно грубый: нужен только первый понятный нам тег, а не полная
  * реализация RFC 9110 с весами. `ru-RU,ru;q=0.9,en;q=0.8` — это «русский».
  */
-export function preferredLocale(acceptLanguage: string): Locale {
+export function preferredLocale(
+  acceptLanguage: string,
+  /* Язык портала приходит параметром: он живёт в настройках базы, а этот
+     модуль обязан оставаться чистым — его импортируют и клиентские
+     компоненты, а `@/core/settings` тянет за собой Prisma. */
+  fallback: Locale = isLocale(product.locale) ? product.locale : 'ru',
+): Locale {
   for (const part of acceptLanguage.split(',')) {
     const tag = part.split(';')[0]?.trim().toLowerCase().split('-')[0]
     if (isLocale(tag)) return tag
   }
-  return isLocale(product.locale) ? product.locale : 'ru'
+  return fallback
 }
 
 /**

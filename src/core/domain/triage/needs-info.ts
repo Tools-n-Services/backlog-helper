@@ -6,7 +6,7 @@
  * обращение из очереди, ничего не решив: метрика «ждёт автора» только растёт,
  * а обращение висит между открытым и закрытым.
  *
- * Поэтому два срока из `config/product.ts`:
+ * Поэтому два срока из настроек портала:
  *
  *   напоминание — человек чаще всего просто не увидел письма;
  *   закрытие    — если не ответил и после напоминания, вопрос снят.
@@ -16,7 +16,7 @@
  * авто-закрытие читается как «от нас отмахнулись».
  */
 
-import { product } from '@config/product'
+import { loadSettings, settings } from '@/core/settings'
 import { prisma } from '@/core/db'
 import { deliverNeedsInfoReminder } from '@/core/mail'
 
@@ -38,11 +38,12 @@ export interface NeedsInfoResult {
  * им незачем.
  */
 export async function processStaleNeedsInfo(origin: string): Promise<NeedsInfoResult> {
+  await loadSettings()
   const result: NeedsInfoResult = { reminded: 0, closed: 0, failed: 0 }
   const now = Date.now()
 
-  const remindBefore = new Date(now - product.needsInfo.remindAfterDays * MS_PER_DAY)
-  const closeBefore = new Date(now - product.needsInfo.closeAfterDays * MS_PER_DAY)
+  const remindBefore = new Date(now - settings().needsInfo.remindAfterDays * MS_PER_DAY)
+  const closeBefore = new Date(now - settings().needsInfo.closeAfterDays * MS_PER_DAY)
 
   /* Сначала закрытие: обращение, которому пора закрываться, не должно
      сначала получить напоминание и письмо о закрытии следом. */
@@ -78,7 +79,7 @@ async function closeStale(closeBefore: Date): Promise<number> {
   }
 
   const note =
-    `Мы просили уточнить детали, но ответа не было ${product.needsInfo.closeAfterDays} дней. ` +
+    `Мы просили уточнить детали, но ответа не было ${settings().needsInfo.closeAfterDays} дней. ` +
     'Закрываем — если вопрос ещё актуален, ответьте в обсуждении, и мы вернёмся к нему.'
 
   for (const post of stale) {
@@ -159,7 +160,7 @@ async function remindStale(
       1,
       Math.round(
         (post.needsInfoSince!.getTime() +
-          product.needsInfo.closeAfterDays * MS_PER_DAY -
+          settings().needsInfo.closeAfterDays * MS_PER_DAY -
           Date.now()) /
           MS_PER_DAY,
       ),

@@ -19,6 +19,14 @@ export interface StatusConfig {
   nameEn?: string
   /** Форма маркера — второй канал кодирования, помимо цвета. */
   shape: StatusShape
+  /**
+   * Имя записи палитры (`config/theme.ts`), а не hex.
+   *
+   * Набор конечен и контраст в нём проверен, поэтому статус, заведённый
+   * в админке, не может остаться без цвета — а мог бы, храни мы цвета
+   * в сборке по ключу статуса.
+   */
+  color: string
   position: number
   /** Попадает колонкой в Roadmap (FR-152). */
   showOnRoadmap: boolean
@@ -31,6 +39,7 @@ export interface StatusConfig {
 export const statuses: StatusConfig[] = [
   {
     key: 'open',
+    color: 'slate',
     name: 'Новое',
     nameEn: 'New',
     shape: 'ring',
@@ -41,6 +50,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'needs-info',
+    color: 'amber',
     name: 'Нужна информация',
     nameEn: 'Needs info',
     shape: 'half',
@@ -50,6 +60,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'planned',
+    color: 'violet',
     name: 'Запланировано',
     nameEn: 'Planned',
     shape: 'dot',
@@ -59,6 +70,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'building',
+    color: 'teal',
     name: 'В работе',
     nameEn: 'In progress',
     shape: 'half',
@@ -68,6 +80,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'completed',
+    color: 'green',
     name: 'Готово',
     nameEn: 'Done',
     shape: 'check',
@@ -77,6 +90,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'not-reproducible',
+    color: 'rust',
     name: 'Не воспроизводится',
     nameEn: 'Not reproducible',
     shape: 'cross',
@@ -86,6 +100,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'duplicate',
+    color: 'plum',
     name: 'Дубль',
     nameEn: 'Duplicate',
     shape: 'dash',
@@ -99,6 +114,7 @@ export const statuses: StatusConfig[] = [
        воспроизвести, и не «не будем делать»: решения не принимали. Человеку,
        который вернётся через месяц, разница видна сразу. */
     key: 'no-response',
+    color: 'gray',
     name: 'Закрыто без ответа',
     nameEn: 'No response',
     shape: 'dash',
@@ -108,6 +124,7 @@ export const statuses: StatusConfig[] = [
   },
   {
     key: 'wont-fix',
+    color: 'gray',
     name: 'Не будем делать',
     nameEn: "Won't do",
     shape: 'cross',

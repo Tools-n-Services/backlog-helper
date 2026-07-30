@@ -3,7 +3,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { fill, formatCount, type Dictionary, type Locale } from '@/core/content'
 import { content, locale } from '@/core/locale'
 import { queries } from '@/queries'
@@ -30,7 +30,7 @@ function readKinds(value: string | string[] | undefined): ChangeKind[] {
 export default async function ChangelogPage({
   searchParams,
 }: PageProps<'/changelog'>) {
-  if (!product.features.changelog) notFound()
+  if (!settings().features.changelog) notFound()
 
   const [params, t, lang] = await Promise.all([searchParams, content(), locale()])
   const kinds = readKinds(params['kind'])
@@ -50,7 +50,7 @@ export default async function ChangelogPage({
         <h1 className="text-h1 font-light text-ink md:text-display">
           {t.changelog.headingLight}{' '}
           <span className="font-extrabold">
-            {t.changelog.headingBoldPrefix} {product.name}
+            {t.changelog.headingBoldPrefix} {settings().name}
           </span>
         </h1>
         <p className="mt-5 text-body-l text-muted">{t.changelog.lead}</p>

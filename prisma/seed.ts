@@ -90,9 +90,10 @@ async function seedStatuses() {
       name: s.name,
       nameEn: s.nameEn ?? null,
       shape: s.shape,
-      /* Цвет — имя токена темы, не hex: правила форка запрещают хранить
-         конкретные цвета в данных. */
-      color: `status-${s.key}`,
+      /* Цвет — имя записи палитры (config/theme.ts), не hex и не токен:
+         набор конечен, контраст в нём проверен, и статус, заведённый
+         в админке, не остаётся без цвета. */
+      color: s.color,
       position: s.position,
       showOnRoadmap: s.showOnRoadmap,
       isTerminal: s.isTerminal,

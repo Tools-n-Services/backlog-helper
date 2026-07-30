@@ -1,4 +1,4 @@
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { content } from '@/core/locale'
 
 export async function SiteFooter() {
@@ -8,9 +8,9 @@ export async function SiteFooter() {
     <footer className="mt-20 border-t border-line">
       <div className="mx-auto flex max-w-page flex-wrap items-center gap-x-6 gap-y-2 px-5 py-8 font-mono text-label uppercase text-faint md:px-8 lg:px-10">
         <span>
-          {product.name} · {t.footer.poweredBy}
+          {settings().name} · {t.footer.poweredBy}
         </span>
-        <span className="ml-auto">{product.domain}</span>
+        <span className="ml-auto">{settings().domain}</span>
       </div>
     </footer>
   )

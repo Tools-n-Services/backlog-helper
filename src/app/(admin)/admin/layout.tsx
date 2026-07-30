@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { isStaff } from '@/core/permissions'
 import { getViewer } from '@/core/session'
 import { Avatar } from '@/ui/primitives/avatar'
@@ -44,7 +44,7 @@ export default async function AdminLayout({
         <div className="flex h-11 items-center gap-5 px-4">
           <Link href="/" className="flex shrink-0 items-center gap-2">
             <span className="flex size-5 items-center justify-center rounded-pill bg-ink text-[10px] font-bold text-surface">
-              {product.mark}
+              {settings().mark}
             </span>
             <span className="text-small font-semibold text-ink">Внутренняя часть</span>
           </Link>

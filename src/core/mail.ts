@@ -33,7 +33,7 @@ import path from 'node:path'
 
 import nodemailer, { type Transporter } from 'nodemailer'
 
-import { product } from '@config/product'
+import { loadSettings, settings } from '@/core/settings'
 
 export interface Letter {
   to: string
@@ -71,9 +71,9 @@ export function senderAddress(): string {
   if (explicit) return explicit
 
   const user = process.env.SMTP_USER?.trim()
-  if (mailProvider() === 'smtp' && user) return `${product.name} <${user}>`
+  if (mailProvider() === 'smtp' && user) return `${settings().name} <${user}>`
 
-  return `${product.name} <no-reply@${product.domain}>`
+  return `${settings().name} <no-reply@${settings().domain}>`
 }
 
 /**
@@ -110,6 +110,10 @@ function isReservedAddress(address: string): boolean {
  * Решение о повторе принимает тот, кто ставил письмо в очередь.
  */
 export async function send(letter: Letter): Promise<SendResult> {
+  /* Письма уходят и из воркера, и из серверных действий — мимо слоя
+     запросов. Настройки грузим здесь: имя портала в отправителе не должно
+     зависеть от того, кто именно вызвал отправку. */
+  await loadSettings()
   const provider = mailProvider()
 
   /* Настоящий канал плюс демонстрационный адрес — это не письмо, а отказ,
@@ -497,7 +501,7 @@ async function sendToFile(letter: Letter): Promise<SendResult> {
 export async function deliverSignInLink(to: string, url: string): Promise<SendResult> {
   return send({
     to,
-    subject: `Вход в ${product.name}`,
+    subject: `Вход в ${settings().name}`,
     text:
       `Ссылка для входа — действует 15 минут и открывается один раз:\n\n${url}\n\n` +
       'Если вход запрашивали не вы, письмо можно проигнорировать: без перехода по ссылке ничего не произойдёт.',

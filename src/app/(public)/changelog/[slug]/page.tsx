@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { fill, formatCount, localizedForms, plural } from '@/core/content'
 import { content, locale } from '@/core/locale'
 import { queries } from '@/queries'
@@ -32,7 +32,7 @@ export async function generateMetadata({
 export default async function ChangelogEntryPage({
   params,
 }: PageProps<'/changelog/[slug]'>) {
-  if (!product.features.changelog) notFound()
+  if (!settings().features.changelog) notFound()
 
   const [{ slug }, t, lang] = await Promise.all([params, content(), locale()])
   const entry = await queries.getChangelogEntry(slug)

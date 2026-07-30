@@ -34,6 +34,9 @@ test('переименование доски в базе видно на пор
   await expect(page.getByRole('link', { name: ORIGINAL, exact: true })).toBeVisible()
 
   rename('product', RENAMED)
+  /* Ждём, пока протухнет снимок справочника: правка идёт из другого
+     процесса, и сбросить его ей нечем — в жизни это делает админка. */
+  await page.waitForTimeout(1500)
 
   await page.goto('/')
   await expect(page.getByRole('link', { name: RENAMED, exact: true })).toBeVisible()

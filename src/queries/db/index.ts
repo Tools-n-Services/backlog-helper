@@ -12,7 +12,7 @@
  * в базе значит требовать миграцию ради смены подписи.
  */
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { backlogKinds, backlogKindName } from '@config/internal-statuses'
 import { severities } from '@config/scoring'
 import type { Privacy } from '@config/post-types'
@@ -409,7 +409,7 @@ export const dbQueries: QueryPort = {
 
   async getFeed(query: FeedQuery, userId?: string): Promise<FeedResult> {
     const now = new Date()
-    const limit = query.limit ?? product.limits.feedPageSize
+    const limit = query.limit ?? settings().limits.feedPageSize
     const matches = await searchMatches(query.search)
     const where = feedWhere(query, matches)
 
@@ -590,7 +590,7 @@ export const dbQueries: QueryPort = {
       statusHistory,
       voters: row.votes.map((v) => toPerson(v.user)),
       votersTotal: row.voteCount,
-      votersHidden: !product.features.voterList,
+      votersHidden: !settings().features.voterList,
       merged: row.mergedFrom.map((m) => ({
         title: m.title,
         slug: m.slug,

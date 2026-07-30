@@ -15,7 +15,7 @@
  * нажатия дают одну публикацию.
  */
 
-import { product } from '@config/product'
+import { loadSettings, settings } from '@/core/settings'
 import { prisma } from '@/core/db'
 
 export type PublishOutcome =
@@ -34,6 +34,10 @@ export async function publishRelease(
   entryId: string,
   actorId: string | null,
 ): Promise<PublishOutcome> {
+  /* Публикацию запускает и человек из админки, и проход воркера по сроку:
+     статус «выпущено» приходит из настроек, и грузить их обязан тот, кто
+     публикует. */
+  await loadSettings()
   const entry = await prisma.changelogEntry.findUnique({
     where: { id: entryId },
     select: { id: true, title: true, version: true, publishedAt: true },
@@ -42,7 +46,7 @@ export async function publishRelease(
   if (entry.publishedAt) return { ok: false, reason: 'already-published' }
 
   const released = await prisma.status.findUnique({
-    where: { key: product.releasedStatusKey },
+    where: { key: settings().releasedStatusKey },
     select: { id: true, isTerminal: true },
   })
   /* Публиковать запись, не сумев закрыть обращения, нельзя: письма о выпуске

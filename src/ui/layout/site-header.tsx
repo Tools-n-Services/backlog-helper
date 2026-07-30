@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import { catalog, loadCatalog } from '@/core/catalog'
 import { localized, locales } from '@/core/content'
 import { content, locale } from '@/core/locale'
@@ -21,6 +21,7 @@ export async function SiteHeader() {
        правятся в админке (В1, docs/09-install.md). */
     loadCatalog(),
   ])
+  const site = settings()
   const boards = catalog()
     .boards.filter((b) => !b.hiddenFromNav && b.visibility !== 'private')
     .sort((a, b) => a.position - b.position)
@@ -31,13 +32,13 @@ export async function SiteHeader() {
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2.5 rounded-field"
-          aria-label={product.name}
+          aria-label={site.name}
         >
           <span className="flex size-7 items-center justify-center rounded-pill bg-ink text-[12px] font-bold text-surface">
-            {product.mark}
+            {site.mark}
           </span>
           <span className="text-body font-semibold tracking-tight text-ink">
-            {product.name}
+            {site.name}
           </span>
         </Link>
 
@@ -58,7 +59,7 @@ export async function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-2">
           <LanguageSwitch current={lang} options={locales} label={t.nav.language} />
-          {product.features.roadmap && (
+          {site.features.roadmap && (
             <Link
               href="/roadmap"
               className="hidden rounded-pill px-3 py-1.5 text-body text-muted transition-colors hover:bg-track hover:text-ink sm:block"
@@ -66,7 +67,7 @@ export async function SiteHeader() {
               {t.nav.roadmap}
             </Link>
           )}
-          {product.features.changelog && (
+          {site.features.changelog && (
             <Link
               href="/changelog"
               className="hidden rounded-pill px-3 py-1.5 text-body text-muted transition-colors hover:bg-track hover:text-ink sm:block"

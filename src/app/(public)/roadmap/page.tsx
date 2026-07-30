@@ -3,7 +3,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { product } from '@config/product'
+import { settings } from '@/core/settings'
 import {
   fill,
   formatCount,
@@ -30,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * а не список в коде: у разных продуктов рабочий процесс разный.
  */
 export default async function RoadmapPage({ searchParams }: PageProps<'/roadmap'>) {
-  if (!product.features.roadmap) notFound()
+  if (!settings().features.roadmap) notFound()
 
   const [{ board, expand }, t, lang] = await Promise.all([
     searchParams,
