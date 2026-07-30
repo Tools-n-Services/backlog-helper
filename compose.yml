@@ -33,6 +33,11 @@ services:
       retries: 20
 
   app:
+    # Образ из реестра репозитория, сборка — запасной путь. С обоими полями
+    # `docker compose pull` берёт готовый образ, а `up --build` собирает
+    # из исходников: первое нужно для установки и обновления, второе —
+    # тем, кто правит код.
+    image: ghcr.io/tools-n-services/backlog-helper:${IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
     depends_on:
@@ -67,6 +72,7 @@ services:
       retries: 10
 
   worker:
+    image: ghcr.io/tools-n-services/backlog-helper:${IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
     depends_on:
