@@ -47,6 +47,8 @@ export type Permission =
   | 'user.ban'
   /** Назначать роли. */
   | 'user.role'
+  /** Править настройки портала и схемы форм (В3, docs/09-install.md). */
+  | 'settings.edit'
 
 const REQUIRED: Record<Permission, AccessRole> = {
   'team.view': 'moderator',
@@ -63,6 +65,10 @@ const REQUIRED: Record<Permission, AccessRole> = {
   /* Раздача прав — только владелец: администратор, способный назначить
      себе владельца, делает роль владельца бессмысленной. */
   'user.role': 'owner',
+  /* Схема формы решает, что портал спрашивает у каждого пришедшего и что
+     попадает в приватную диагностику. Ошибка здесь видна всем сразу
+     и правится только тем, кто её заметил, — это уровень администратора. */
+  'settings.edit': 'admin',
 }
 
 export interface Principal {

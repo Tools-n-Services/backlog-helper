@@ -306,6 +306,8 @@ export interface CreatePostInput {
   frequency?: string | undefined
   startedAt?: string | undefined
   environment?: unknown
+  /** Значения полей, у которых нет своей колонки (В3). */
+  customFields?: Record<string, unknown>
   /** Канал приёма (FR-557). */
   sourceKey?: string
   /** Обращения от новых аккаунтов уходят в модерацию (FR-201). */
@@ -375,6 +377,9 @@ export async function createPost(input: CreatePostInput): Promise<CreatedPost> {
       frequency: (input.frequency ?? null) as never,
       startedAt: input.startedAt ?? null,
       environment: (input.environment ?? null) as never,
+      /* Поля из редактора схемы — как есть: своей колонки у них нет,
+         и логики за ними тоже (В3). */
+      customFields: (input.customFields ?? {}) as never,
       /* Срок первого ответа считается при приёме — из политики, а не руками
          (FR-538). Для типов без политики остаётся null: обещать ответ
          на каждую идею за N часов невыполнимо. */

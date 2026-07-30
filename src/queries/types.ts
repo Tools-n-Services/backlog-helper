@@ -231,6 +231,20 @@ export interface PostDetailView extends PostCardView {
   subscribed: boolean
   /** Вложения, которые смотрящему разрешено видеть (FR-512, FR-561). */
   attachments: AttachmentView[]
+  /**
+   * Поля, заведённые в редакторе схемы (В3): подпись из схемы, значение
+   * из `custom_fields`. Собственной логики у них нет — они показываются
+   * и уходят в письма, но не участвуют ни в SLA, ни в приоритизации.
+   */
+  customFields: CustomFieldView[]
+}
+
+export interface CustomFieldView {
+  name: string
+  label: string
+  labelEn?: string
+  /** Уже готово к показу: список сведён в строку через запятую. */
+  value: string
 }
 
 /**

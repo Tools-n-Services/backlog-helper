@@ -21,6 +21,7 @@ import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/core/db'
 import { attachmentRules } from '@config/attachments'
 import { catalog } from '@/core/catalog'
+import { isSystemField } from '@/core/domain/intake/form-schema'
 import { insightSourceName } from '@/core/domain/backlog/insights'
 import { changeKindName, changeKinds } from '@/core/domain/changelog/kinds'
 import { autoPriority } from '@/core/domain/triage/priority'
@@ -38,6 +39,7 @@ import type {
   ChangelogQuery,
   ChangelogResult,
   CommentView,
+  CustomFieldView,
   FacetView,
   FeedQuery,
   BacklogItemDetailView,
@@ -72,6 +74,44 @@ import type {
 /** Название типа вложения из конфига: «Изображение», «Лог». */
 function attachmentKindName(kind: string): string {
   return attachmentRules.find((rule) => rule.kind === kind)?.name ?? 'Файл'
+}
+
+/**
+ * Поля из редактора схемы — к показу.
+ *
+ * Подпись берётся из схемы типа, а не из ключа: ключ технический
+ * («repro-rate»), а человек должен увидеть то же, что вводил. Поля, которых
+ * в схеме больше нет, не показываются: их удалили осознанно, и вытаскивать
+ * их обратно на экран значило бы спорить с этим решением.
+ */
+function customFieldViews(typeKey: string, stored: unknown): CustomFieldView[] {
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return []
+  const values = stored as Record<string, unknown>
+  const schema = catalog().typeByKey.get(typeKey)?.formSchema ?? []
+
+  return schema.flatMap((field) => {
+    if (isSystemField(field.name)) return []
+    const value = values[field.name]
+    if (value === undefined || value === null || value === '') return []
+
+    const shown = Array.isArray(value)
+      ? value.map(String).join(', ')
+      : typeof value === 'boolean'
+        ? value
+          ? 'да'
+          : 'нет'
+        : String(value)
+    if (!shown) return []
+
+    return [
+      {
+        name: field.name,
+        label: field.label,
+        ...(field.labelEn ? { labelEn: field.labelEn } : {}),
+        value: shown,
+      },
+    ]
+  })
 }
 
 function toAttachmentView(row: {
@@ -453,6 +493,7 @@ export const dbQueries: QueryPort = {
         ref: true,
         eta: true,
         authorId: true,
+        customFields: true,
         author: { select: { name: true, role: true, isTeam: true } },
         mergedInto: {
           select: { slug: true, title: true, board: { select: { slug: true } } },
@@ -611,6 +652,7 @@ export const dbQueries: QueryPort = {
               (a.uploadedById === userId || row.authorId === userId)),
         )
         .map(toAttachmentView),
+      customFields: customFieldViews(row.type.key, row.customFields),
     }
   },
 

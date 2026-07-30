@@ -178,6 +178,22 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
           />
           </TranslationScope>
 
+          {post.customFields.length > 0 && (
+            /* Поля из редактора схемы. Отдельным списком, а не абзацами
+               в теле: короткое значение с подписью читается как факт,
+               а вклеенное в текст теряется. */
+            <dl className="mt-6 grid gap-x-6 gap-y-3 border-t border-line pt-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+              {post.customFields.map((field) => (
+                <div key={field.name} className="contents">
+                  <dt className="text-small font-semibold text-faint">
+                    {localized(field.label, field.labelEn, lang)}
+                  </dt>
+                  <dd className="text-body text-ink-2">{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
           {attachments.length > 0 && <Attachments items={attachments} t={t} />}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">

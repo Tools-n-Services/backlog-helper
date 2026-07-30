@@ -2,6 +2,7 @@
 
 import { settings } from '@/core/settings'
 import { catalog, loadCatalog } from '@/core/catalog'
+import { customValues, goesToBody } from '@/core/domain/intake/form-schema'
 import { prisma } from '@/core/db'
 import {
   bindAttachments,
@@ -161,6 +162,7 @@ export async function submitPost(
     frequency: asString(values.frequency),
     startedAt: asString(values.startedAt),
     environment: values.environment,
+    customFields: customValues(type.formSchema, values),
     moderated,
   })
 
@@ -198,8 +200,10 @@ function detailsFrom(typeKey: string, values: FormValues): string {
 
   const parts: string[] = []
   for (const field of type.formSchema) {
-    if (field.name === 'title' || field.kind === 'attachments') continue
-    if (field.kind === 'environment' || field.kind === 'select') continue
+    /* Только поля тела: свободные показываются отдельной строкой
+       на обращении, и складывать их ещё и в текст значит показать
+       одно и то же значение дважды (В3). */
+    if (!goesToBody(field.name)) continue
     const value = asString(values[field.name])
     if (!value) continue
     /* Единственное текстовое поле не нуждается в заголовке над собой. */
