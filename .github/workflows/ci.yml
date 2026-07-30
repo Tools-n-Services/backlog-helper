@@ -1,0 +1,80 @@
+# Проверки на каждое изменение (В7, docs/09-install.md).
+#
+# Без них несколько установок через год расходятся, и правка не доезжает
+# ни до одной. Прогон идёт против настоящего Postgres: половина проверок
+# здесь — про данные, и подменять базу заглушкой значит проверять не то.
+
+name: Проверки
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    name: Типы, линтер, тесты
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: backlog
+          POSTGRES_PASSWORD: backlog
+          POSTGRES_DB: backlog
+          # Локаль C.UTF-8 обязательна: от неё зависит поиск по кириллице
+          # и работа pg_trgm.
+          POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U backlog"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://backlog:backlog@localhost:5432/backlog
+      # Прогон включает мастер установки: без токена его не существует.
+      INSTALL_TOKEN: e2e-install-token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Схема и демонстрационные данные
+        run: |
+          pnpm db:migrate
+          pnpm db:verify
+          pnpm db:seed
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+      - name: Браузер для сценариев
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Сборка портала
+        run: pnpm build
+
+      - name: Сценарии против собранного портала
+        env:
+          E2E_SERVER_COMMAND: pnpm start
+        run: pnpm test:e2e
+
+      - name: Отчёт о сценариях
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

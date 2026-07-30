@@ -14,7 +14,11 @@ export default defineConfig({
     locale: 'ru-RU',
   },
   webServer: {
-    command: 'pnpm dev',
+    /* Локально — dev-сервер: правку видно сразу. В CI — собранный портал
+       (`E2E_SERVER_COMMAND=pnpm start`): dev компилирует маршруты на первый
+       запрос, и под нагрузкой прогон начинает ловить эту компиляцию вместо
+       ошибок портала. */
+    command: process.env.E2E_SERVER_COMMAND ?? 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     env: {
@@ -31,6 +35,10 @@ export default defineConfig({
       /* Мастер установки без токена в среде не существует вовсе —
          значит прогону токен нужен (В4). */
       INSTALL_TOKEN: 'e2e-install-token',
+      /* Ручной триггер сбоя ленты: сценарий проверяет границу ошибок,
+         а вызвать настоящий сбой базы по требованию нельзя. В бою флага
+         нет, и триггера тоже. */
+      E2E_ALLOW_FEED_FAILURE: '1',
     },
     timeout: 60_000,
   },
