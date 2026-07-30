@@ -15,4 +15,4 @@ COPY docs/presentation.html /srv/index.html
 # не зависела ни от ветки, ни от того, останется ли репозиторий публичным.
 COPY docs/*.md /srv/
 
-EXPOSE 80
+EXPOSE 8000
