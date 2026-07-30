@@ -341,6 +341,7 @@ model AppUser {
   backlogItems    BacklogItem[]
   insights        Insight[]
   sessions        Session[]
+  attachments     Attachment[]
 
   @@map("app_user")
 }
@@ -584,8 +585,15 @@ model CommentMention {
 /// Отдельная таблица, а не массив URL: у вложений бага есть тип, срок жизни и права.
 model Attachment {
   id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Оба пусты, пока файл загружен, а обращение ещё не отправлено:
+  /// такую строку убирает retention по `purge_at`.
   postId       String?              @map("post_id") @db.Uuid
   commentId    String?              @map("comment_id") @db.Uuid
+  /// Кто загрузил. Нужен, чтобы привязать файл к обращению мог только он.
+  uploadedById String?              @map("uploaded_by") @db.Uuid
+  /// Имя файла как его назвал человек: «network.har» и «шаг-3.png» —
+  /// это подпись под ссылкой, а не ключ в хранилище.
+  fileName     String?              @map("file_name")
   kind         AttachmentKind       @default(other)
   /// Ключ в объектном хранилище, не публичный URL: отдача только через
   /// приложение подписанной ссылкой, иначе team_only не соблюсти.
@@ -599,7 +607,8 @@ model Attachment {
   scanVerdict  String?              @map("scan_verdict")
   createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  uploadedBy AppUser? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([postId])
   @@index([purgeAt])

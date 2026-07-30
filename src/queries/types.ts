@@ -151,6 +151,25 @@ export interface MergedPostView {
   movedVotes: number
 }
 
+/**
+ * Вложение обращения (FR-512).
+ *
+ * Ссылка ведёт в приложение, а не в хранилище: право проверяется на каждом
+ * запросе, и пересланная в чат ссылка на `team_only` у постороннего
+ * не откроется.
+ */
+export interface AttachmentView {
+  id: string
+  name: string
+  kindName: string
+  sizeLabel: string
+  /** Показывать картинкой, а не ссылкой: скриншот читается сразу. */
+  isImage: boolean
+  /** Видно только команде и репортеру (FR-561). */
+  teamOnly: boolean
+  url: string
+}
+
 export interface PostDetailView extends PostCardView {
   /** Человекочитаемая ссылка для поддержки: «RTM-4821». */
   ref: string
@@ -171,6 +190,8 @@ export interface PostDetailView extends PostCardView {
   comments: CommentView[]
   /** Подписан ли текущий пользователь на обновления (FR-142). */
   subscribed: boolean
+  /** Вложения, которые смотрящему разрешено видеть (FR-512, FR-561). */
+  attachments: AttachmentView[]
 }
 
 /**
@@ -639,6 +660,15 @@ export interface QueryPort {
   getBacklogItem(id: string): Promise<BacklogItemDetailView | null>
   /** В какие работы попало обращение. Видно только команде. */
   getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]>
+  /**
+   * Все вложения обращения, включая `team_only` (FR-561).
+   *
+   * Отдельным методом, а не флагом в `getPost`: право проверяет экран,
+   * который знает, кто смотрит, — так же, как со связью с бэклогом.
+   * В самой странице обращения лежит только то, что видно смотрящему
+   * без прав команды.
+   */
+  getPostAttachments(postId: string): Promise<AttachmentView[]>
   /** Релизы глазами команды: что закроет публикация (FR-165). */
   getReleases(): Promise<ReleasesView>
   /** Запись в редакторе: поля, изменения и привязанные обращения. */

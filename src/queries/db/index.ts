@@ -21,6 +21,7 @@ import type { Privacy } from '@config/post-types'
 import type { BacklogKind } from '@/generated/prisma/enums'
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/core/db'
+import { attachmentRules } from '@config/attachments'
 import { insightSourceName } from '@/core/domain/backlog/insights'
 import { changeKindName, changeKinds } from '@/core/domain/changelog/kinds'
 import { autoPriority } from '@/core/domain/triage/priority'
@@ -30,7 +31,7 @@ import {
   SEARCH_TRIGRAM_THRESHOLD,
   SIMILARITY_THRESHOLD,
 } from '@/core/domain/intake/similar'
-import { excerptOf, relativeLabel } from '@/core/format'
+import { excerptOf, relativeLabel, sizeLabel } from '@/core/format'
 import type {
   BoardView,
   ChangeKind,
@@ -53,6 +54,7 @@ import type {
   PostTypeView,
   ProfileView,
   QueryPort,
+  AttachmentView,
   ReleaseAdminView,
   ReleaseDetailView,
   ReleasesView,
@@ -67,6 +69,30 @@ import type {
 } from '@/queries/types'
 
 /* ────────────────────── Оформление из конфигурации ────────────────────── */
+
+/** Название типа вложения из конфига: «Изображение», «Лог». */
+function attachmentKindName(kind: string): string {
+  return attachmentRules.find((rule) => rule.kind === kind)?.name ?? 'Файл'
+}
+
+function toAttachmentView(row: {
+  id: string
+  kind: string
+  fileName: string | null
+  sizeBytes: bigint
+  visibility: string
+}): AttachmentView {
+  return {
+    id: row.id,
+    name: row.fileName || attachmentKindName(row.kind),
+    kindName: attachmentKindName(row.kind),
+    sizeLabel: sizeLabel(Number(row.sizeBytes)),
+    isImage: row.kind === 'image',
+    teamOnly: row.visibility === 'team_only',
+    /* Ссылка ведёт в приложение: право проверяется на каждом запросе. */
+    url: `/attachments/${row.id}`,
+  }
+}
 
 function toStatusView(key: string): StatusView {
   const s = statusByKey.get(key)
@@ -393,6 +419,7 @@ export const dbQueries: QueryPort = {
         ...cardSelect,
         ref: true,
         eta: true,
+        authorId: true,
         author: { select: { name: true, role: true, isTeam: true } },
         mergedInto: {
           select: { slug: true, title: true, board: { select: { slug: true } } },
@@ -413,6 +440,18 @@ export const dbQueries: QueryPort = {
           orderBy: { createdAt: 'desc' },
           take: 5,
           select: { user: { select: { name: true, role: true, isTeam: true } } },
+        },
+        attachments: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            kind: true,
+            mime: true,
+            fileName: true,
+            sizeBytes: true,
+            visibility: true,
+            uploadedById: true,
+          },
         },
         comments: {
           where: { deletedAt: null, internal: false },
@@ -511,6 +550,17 @@ export const dbQueries: QueryPort = {
       })),
       comments: topLevel,
       subscribed: Array.isArray(row.subscriptions) && row.subscriptions.length > 0,
+      /* Приватные вложения не просто закрыты ссылкой — их вовсе нет в ответе:
+         строка «файл, который вам нельзя» сообщает постороннему о том,
+         что в обращении есть скриншот, и это уже утечка (FR-561). */
+      attachments: row.attachments
+        .filter(
+          (a) =>
+            a.visibility === 'public' ||
+            (userId !== undefined &&
+              (a.uploadedById === userId || row.authorId === userId)),
+        )
+        .map(toAttachmentView),
     }
   },
 
@@ -1062,6 +1112,22 @@ export const dbQueries: QueryPort = {
         /* Самое востребованное сверху: по нему и решают, браться ли. */
         .sort((a, b) => b.count - a.count),
     }
+  },
+
+  async getPostAttachments(postId: string): Promise<AttachmentView[]> {
+    if (!isUuid(postId)) return []
+    const rows = await prisma.attachment.findMany({
+      where: { postId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        kind: true,
+        fileName: true,
+        sizeBytes: true,
+        visibility: true,
+      },
+    })
+    return rows.map(toAttachmentView)
   },
 
   async getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]> {

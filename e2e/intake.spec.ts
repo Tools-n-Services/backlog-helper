@@ -130,6 +130,35 @@ test('заполненная форма создаёт обращение, ко�
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
 })
 
+test('скриншот прикладывается и виден на обращении', async ({ page }) => {
+  await page.goto('/bugs/new?type=bug')
+  const title = `Кнопка подтверждения уезжает за экран ${Date.now()}`
+  await fillBug(page, title)
+
+  /* Настоящий PNG в восемь байт заголовка: проверяется путь файла,
+     а не картинка. */
+  await page.locator('#field-attachments').setInputFiles({
+    name: 'shag-3.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex'),
+  })
+
+  /* Файл уходит в хранилище сразу при выборе — до отправки формы. */
+  await expect(page.getByText('shag-3.png')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Отправить обращение' }).click()
+  await expect(page.getByText('Обращение отправлено')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Открыть обращение' }).click()
+  await expect(page).toHaveURL(/\/bugs\/p\//, { timeout: 15_000 })
+
+  /* Своё вложение репортер видит, и рядом честно написано, что остальным
+     оно не показывается (FR-561). */
+  await expect(page.getByRole('heading', { name: 'Вложения' })).toBeVisible()
+  await expect(page.getByText('shag-3.png')).toBeVisible()
+  await expect(page.getByText('только команде')).toBeVisible()
+})
+
 test('превышение лимита объясняет причину и срок, а не падает', async ({ page }) => {
   /* Лимит — 2 обращения в час (config/product.ts). Третье должно упереться. */
   for (let i = 1; i <= 3; i++) {

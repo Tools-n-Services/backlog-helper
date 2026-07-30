@@ -43,3 +43,20 @@ export function relativeLabel(at: Date, now: Date): string {
   const years = Math.floor(days / 365)
   return `${years} г. назад`
 }
+
+/**
+ * Размер файла словами: «4,2 МБ».
+ *
+ * Живёт здесь, а не рядом с загрузкой вложений: подпись под полем выбора
+ * файла рисует браузер, и модуль с драйвером Postgres в клиентскую сборку
+ * тянуть нельзя.
+ */
+export function sizeLabel(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`
+
+  const mb = bytes / (1024 * 1024)
+  /* Круглые значения — без дробной части: «до 25,0 МБ» в подписи к полю
+     выглядит как результат вычисления, а это просто предел из конфига. */
+  return Number.isInteger(mb) ? `${mb} МБ` : `${mb.toFixed(1).replace('.', ',')} МБ`
+}

@@ -18,6 +18,7 @@
 import { prisma } from '@/core/db'
 import { recalculateBacklogScores } from '@/core/domain/backlog/scoring'
 import { publishScheduled } from '@/core/domain/changelog/releases'
+import { purgeAttachments } from '@/core/domain/intake/attachments'
 import {
   recalculateAffected,
   recalculateTrending,
@@ -37,6 +38,7 @@ type JobName =
   | 'trending'
   | 'affected'
   | 'backlog'
+  | 'attachments'
   | 'reconcile'
 
 interface Job {
@@ -134,6 +136,21 @@ const JOBS: Job[] = [
     run: async () => {
       const { updated } = await recalculateBacklogScores()
       return updated === 0 ? null : `обновлено работ: ${updated}`
+    },
+  },
+  {
+    name: 'attachments',
+    what: 'retention вложений',
+    /* Раз в час: сроки здесь в сутках и днях, но брошенные загрузки лучше
+       убирать заметно раньше, чем они успеют накопиться за ночь. */
+    everyMs: HOUR,
+    run: async () => {
+      const r = await purgeAttachments()
+      if (r.scheduled + r.purged + r.failed === 0) return null
+      return (
+        `назначено к удалению: ${r.scheduled}, удалено: ${r.purged}` +
+        (r.failed > 0 ? `, хранилище не отдало: ${r.failed} (повторим)` : '')
+      )
     },
   },
   {

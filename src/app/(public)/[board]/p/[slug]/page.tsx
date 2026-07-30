@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { formatCount, plural } from '@/core/content'
-import { can } from '@/core/permissions'
+import { can, isStaff } from '@/core/permissions'
 import { canContribute, getViewer } from '@/core/session'
 import { submitCommentForm } from '@/features/post/actions'
 import { PostActions } from '@/features/post/post-actions'
@@ -15,7 +15,7 @@ import { MergedPosts, StatusHistory, Voters } from '@/ui/post/post-aside'
 import { Avatar } from '@/ui/primitives/avatar'
 import { Chip } from '@/ui/primitives/chip'
 import { StatusBadge } from '@/ui/primitives/status-badge'
-import type { BacklogLinkView, PostMergedView } from '@/queries/types'
+import type { AttachmentView, BacklogLinkView, PostMergedView } from '@/queries/types'
 
 export async function generateMetadata({
   params,
@@ -63,6 +63,13 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
   const backlogLinks = can(viewer, 'triage.decide')
     ? await queries.getBacklogLinksForPost(post.id)
     : []
+
+  /* Команде видны все вложения, включая team_only: скриншот с чужими
+     фамилиями ради этого и закрыт от ленты, но разбирать баг без него
+     невозможно (FR-561). Остальным страница отдаёт только их собственное. */
+  const attachments = isStaff(viewer)
+    ? await queries.getPostAttachments(post.id)
+    : post.attachments
 
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-8 md:px-8 lg:px-10">
@@ -131,6 +138,8 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
               </p>
             ))}
           </div>
+
+          {attachments.length > 0 && <Attachments items={attachments} />}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
             <div className="flex items-center gap-3">
@@ -273,5 +282,55 @@ function MergedNotice({ result }: { result: PostMergedView }) {
         <p className="mt-3 text-small text-faint">{result.target.title}</p>
       </div>
     </div>
+  )
+}
+
+/**
+ * Вложения обращения (FR-512).
+ *
+ * Изображение показывается сразу картинкой: скриншот бага читается за
+ * секунду, а ссылка «screenshot.png» требует открыть её и вернуться.
+ * Остальное — ссылкой с типом и размером.
+ *
+ * Пометка «только команде» стоит рядом с файлом не для красоты: репортер
+ * должен видеть, что его скриншот с чужими фамилиями не попал в ленту.
+ */
+function Attachments({ items }: { items: AttachmentView[] }) {
+  return (
+    <section className="mt-6">
+      <h2 className="mb-2 text-body font-semibold text-ink">Вложения</h2>
+      <ul className="space-y-2">
+        {items.map((file) => (
+          <li key={file.id}>
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-baseline gap-2 text-small text-ink-2 hover:text-ink"
+            >
+              <span className="min-w-0 truncate font-semibold">{file.name}</span>
+              <span className="shrink-0 text-faint">{file.kindName}</span>
+              <span className="tnum shrink-0 text-faint">{file.sizeLabel}</span>
+              {file.teamOnly && (
+                <span className="shrink-0 rounded-field bg-track px-1.5 text-faint">
+                  только команде
+                </span>
+              )}
+            </a>
+            {file.isImage && (
+              /* eslint-disable-next-line @next/next/no-img-element --
+                 next/image здесь не годится: файл отдаёт приложение после
+                 проверки прав, а оптимизатор ходит за ним своим агентом
+                 без сессии и получает 404. */
+              <img
+                src={file.url}
+                alt={file.name}
+                className="mt-1 max-h-96 rounded-card border border-line"
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 
+import { attachmentRules, maxAttachmentsPerPost } from '@config/attachments'
+import { sizeLabel } from '@/core/format'
 import {
   ENVIRONMENT_LABELS,
   type EnvironmentInfo,
 } from '@/core/domain/intake/environment'
 import type { FormField } from '@config/post-types'
+
+import { discardAttachmentAction, uploadAttachmentAction } from './actions'
 
 /**
  * Рендер поля по его описанию из схемы типа.
@@ -129,7 +133,11 @@ export function Field({
         />
       )}
 
-      {field.kind === 'attachments' && <AttachmentsField id={id} />}
+      {field.kind === 'attachments' && (
+        /* Список загруженного держит сам компонент: в значении формы живут
+           только идентификаторы, а имена и размеры нужны лишь ему. */
+        <AttachmentsField id={id} onChange={onChange} />
+      )}
 
       {field.hint && (
         <p id={`${id}-hint`} className="mt-1.5 text-small text-faint">
@@ -205,34 +213,130 @@ function EnvironmentField({
   )
 }
 
-/** Вложения. Загрузка в объектное хранилище ещё не подключена (FR-512). */
-function AttachmentsField({ id }: { id: string }) {
-  const [names, setNames] = useState<string[]>([])
+interface Uploaded {
+  id: string
+  name: string
+  size: string
+}
+
+/**
+ * Вложения (FR-512).
+ *
+ * Файл уходит в хранилище сразу при выборе, а не вместе с формой. Причина
+ * не в удобстве: скриншот в пятьдесят мегабайт, отправленный вместе с текстом,
+ * либо упирается в лимит тела запроса, либо заставляет человека ждать после
+ * нажатия «Отправить» — а он в этот момент уже считает, что закончил.
+ *
+ * Отказ показывается сразу и словами: «такие файлы не принимаем» на этапе
+ * выбора экономит тот самый раунд переписки, ради которого вложения и нужны.
+ */
+function AttachmentsField({
+  id,
+  onChange,
+}: {
+  id: string
+  onChange: (value: string[]) => void
+}) {
+  const [files, setFiles] = useState<Uploaded[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  const accept = attachmentRules.flatMap((rule) => rule.mimes).join(',')
+
+  const upload = (chosen: FileList | null) => {
+    const list = [...(chosen ?? [])]
+    if (list.length === 0) return
+    setError(null)
+
+    startTransition(async () => {
+      const added: Uploaded[] = []
+      for (const file of list.slice(0, maxAttachmentsPerPost - files.length)) {
+        const data = new FormData()
+        data.set('file', file)
+        const result = await uploadAttachmentAction(data)
+        if (!result.ok) {
+          setError(result.message)
+          continue
+        }
+        added.push({ id: result.id, name: result.name, size: sizeLabel(result.sizeBytes) })
+      }
+      if (added.length === 0) return
+      const next = [...files, ...added]
+      setFiles(next)
+      onChange(next.map((f) => f.id))
+    })
+  }
+
+  const discard = (fileId: string) => {
+    const next = files.filter((f) => f.id !== fileId)
+    setFiles(next)
+    onChange(next.map((f) => f.id))
+    startTransition(async () => {
+      await discardAttachmentAction(fileId)
+    })
+  }
+
+  const full = files.length >= maxAttachmentsPerPost
 
   return (
     <div className="rounded-field border border-dashed border-line bg-surface px-3.5 py-4">
-      <label htmlFor={id} className="cursor-pointer text-body text-muted">
-        Перетащите скриншот, видео или лог — или{' '}
-        <span className="font-semibold text-ink underline">выберите файл</span>
+      <label
+        htmlFor={id}
+        className={full ? 'text-body text-faint' : 'cursor-pointer text-body text-muted'}
+      >
+        {pending ? (
+          'Загружаем…'
+        ) : full ? (
+          `Больше ${maxAttachmentsPerPost} файлов к одному обращению не прикладываем`
+        ) : (
+          <>
+            Перетащите скриншот, видео или лог — или{' '}
+            <span className="font-semibold text-ink underline">выберите файл</span>
+          </>
+        )}
       </label>
       <input
         id={id}
         type="file"
         multiple
+        accept={accept}
+        disabled={pending || full}
         className="sr-only"
-        onChange={(e) => setNames([...(e.target.files ?? [])].map((f) => f.name))}
+        onChange={(e) => {
+          upload(e.target.files)
+          /* Сброс значения: иначе тот же файл, выбранный второй раз после
+             удаления, не даёт события change. */
+          e.target.value = ''
+        }}
       />
-      {names.length > 0 && (
+
+      {files.length > 0 && (
         <ul className="mt-2 space-y-1">
-          {names.map((name) => (
-            <li key={name} className="text-small text-ink-2">
-              {name}
+          {files.map((file) => (
+            <li key={file.id} className="flex items-baseline gap-2 text-small text-ink-2">
+              <span className="min-w-0 truncate">{file.name}</span>
+              <span className="tnum shrink-0 text-faint">{file.size}</span>
+              <button
+                type="button"
+                onClick={() => discard(file.id)}
+                className="ml-auto shrink-0 rounded-field px-2 text-muted hover:bg-track hover:text-ink"
+              >
+                Убрать
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      {error && <p className="mt-1.5 text-small text-[var(--color-signal-error)]">{error}</p>}
+
       <p className="mt-1.5 text-small text-faint">
-        До 50 МБ. Изображения, видео, логи и HAR.
+        {/* Пределы — из конфига: подпись, разошедшаяся с проверкой на сервере,
+            обещает то, что будет отвергнуто. */}
+        {attachmentRules
+          .map((rule) => `${rule.name} до ${sizeLabel(rule.maxBytes)}`)
+          .join(' · ')}
+        . Видны только команде.
       </p>
     </div>
   )

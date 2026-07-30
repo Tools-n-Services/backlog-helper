@@ -3,6 +3,12 @@
 import { product } from '@config/product'
 import { postTypeByKey } from '@config/post-types'
 import { prisma } from '@/core/db'
+import {
+  bindAttachments,
+  discardAttachment,
+  uploadAttachment,
+  type UploadOutcome,
+} from '@/core/domain/intake/attachments'
 import { checkRateLimit } from '@/core/domain/intake/rate-limit'
 import {
   hasErrors,
@@ -14,6 +20,45 @@ import { createPost } from '@/core/domain/post/mutations'
 import { canContribute, getViewer } from '@/core/session'
 import { queries } from '@/queries'
 import type { SimilarPostView } from '@/queries/types'
+
+/**
+ * Загрузка вложения (FR-512).
+ *
+ * Файл уходит в хранилище сразу при выборе, а не вместе с формой: человек
+ * должен увидеть, что скриншот дошёл, пока ещё пишет текст. До отправки
+ * формы вложение живёт без обращения и убирается retention через сутки,
+ * если форму так и не отправили.
+ */
+export async function uploadAttachmentAction(formData: FormData): Promise<UploadOutcome> {
+  const viewer = await getViewer()
+  if (!viewer.signedIn) {
+    return { ok: false, reason: 'type', message: 'Войдите, чтобы прикладывать файлы.' }
+  }
+  if (!canContribute(viewer)) {
+    return { ok: false, reason: 'type', message: 'Аккаунт заблокирован.' }
+  }
+
+  const file = formData.get('file')
+  if (!(file instanceof File)) {
+    return { ok: false, reason: 'empty', message: 'Файл не получен.' }
+  }
+
+  return uploadAttachment(
+    {
+      name: file.name,
+      mime: file.type,
+      bytes: Buffer.from(await file.arrayBuffer()),
+    },
+    viewer.id,
+  )
+}
+
+/** Убрать файл, который передумали прикладывать. */
+export async function discardAttachmentAction(id: string): Promise<void> {
+  const viewer = await getViewer()
+  if (!viewer.signedIn) return
+  await discardAttachment(id, viewer.id)
+}
 
 /** Поиск похожих на вводе заголовка (FR-122). */
 export async function searchSimilar(
@@ -117,6 +162,12 @@ export async function submitPost(
     environment: values.environment,
     moderated,
   })
+
+  /* Вложения уже в хранилище — здесь они получают обращение и видимость
+     из приватности его типа (FR-561). Привязка после создания, а не вместе
+     с ним: упавшая привязка не должна отменять само обращение. */
+  const attachments = Array.isArray(values.attachments) ? values.attachments : []
+  await bindAttachments(created.id, attachments.map(String), viewer.id)
 
   return {
     ok: true,
