@@ -210,6 +210,30 @@ suite('письма и настройки', () => {
     assert.equal(mine.length, 1)
   })
 
+  it('демонстрационные адреса не считаются отправленными письмами', async () => {
+    const author = await user('reserved-domain')
+    const team = await prisma.appUser.findFirstOrThrow({ where: { accessRole: 'admin' } })
+    const post = await makePost(author.id, 'Обращение подписчика с демонстрационным адресом')
+
+    await applyDecision(post.id, 'confirm', team.id, '')
+
+    /* На настоящем канале адрес из example.com отскочит, и доля отказов
+       решает, попадут ли следующие письма в ящик. Пропуск при этом обязан
+       считаться пропуском: сложенный с отправленными, он рапортует
+       о письмах, которых никто не получал. */
+    const saved = process.env.MAIL_PROVIDER
+    process.env.MAIL_PROVIDER = 'resend'
+    try {
+      const result = await dispatchNotifications(ORIGIN)
+      assert.equal(result.letters, 0, 'письмо засчитано отправленным')
+      assert.ok(result.skipped > 0, 'пропуск не посчитан')
+      /* Переход разобран — иначе он вернётся в очередь навсегда. */
+      assert.equal(result.changes, 1)
+    } finally {
+      process.env.MAIL_PROVIDER = saved
+    }
+  })
+
   it('отписавшийся не получает писем, даже если настройка включена', async () => {
     const author = await user('unsubscribed')
     const team = await prisma.appUser.findFirstOrThrow({ where: { accessRole: 'admin' } })

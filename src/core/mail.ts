@@ -76,7 +76,31 @@ export function senderAddress(): string {
   return `${product.name} <no-reply@${product.domain}>`
 }
 
-export type SendResult = { ok: true } | { ok: false; error: string }
+/**
+ * `skipped` — письмо не отправлено намеренно и повтора не требует.
+ * Считать такое отправленным нельзя: журнал прохода начнёт рапортовать
+ * о сотнях писем, которых никто не получал.
+ */
+export type SendResult = { ok: true; skipped?: boolean } | { ok: false; error: string }
+
+/**
+ * Домены, которые по стандарту не принимают почту (RFC 2606, RFC 6761).
+ *
+ * Ровно на них живут демонстрационные данные (`voter.7@example.com`), и это
+ * не мелочь: письмо такому адресу гарантированно отскакивает, а доля отказов
+ * — главное, по чему почтовые сервисы судят отправителя. Один проход рассылки
+ * по демонстрационной базе с настоящим каналом портит репутацию домена,
+ * с которого потом полетят настоящие письма живым людям.
+ */
+const RESERVED_DOMAINS = ['example.com', 'example.net', 'example.org', 'localhost']
+const RESERVED_SUFFIXES = ['.test', '.example', '.invalid', '.localhost']
+
+function isReservedAddress(address: string): boolean {
+  const domain = address.split('@').at(-1)?.trim().toLowerCase() ?? ''
+  return (
+    RESERVED_DOMAINS.includes(domain) || RESERVED_SUFFIXES.some((s) => domain.endsWith(s))
+  )
+}
 
 /**
  * Отправляет письмо.
@@ -87,6 +111,20 @@ export type SendResult = { ok: true } | { ok: false; error: string }
  */
 export async function send(letter: Letter): Promise<SendResult> {
   const provider = mailProvider()
+
+  /* Настоящий канал плюс демонстрационный адрес — это не письмо, а отказ,
+     который испортит доставку следующим. Считаем такое письмо разобранным:
+     вернуть ошибку значило бы оставить его в очереди навсегда и получать
+     тот же отказ каждым проходом воркера. Файловый ящик и консоль пропускаем
+     как есть — там ничего никуда не уходит. */
+  if (provider !== 'file' && provider !== 'log' && isReservedAddress(letter.to)) {
+    console.warn(
+      `[mail] ${letter.to} — зарезервированный домен, письмо не отправлено. ` +
+        'Это демонстрационные данные: в боевой базе их быть не должно.',
+    )
+    return { ok: true, skipped: true }
+  }
+
   try {
     switch (provider) {
       case 'smtp':

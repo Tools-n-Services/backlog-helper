@@ -61,7 +61,7 @@ async function withStand(
 }
 
 const letter = {
-  to: 'author@example.com',
+  to: 'author@ritmika.app',
   subject: 'Обращение перешло в статус «Запланировано»',
   text: 'Тело письма с кириллицей.',
 }
@@ -111,6 +111,23 @@ describe('запрос к Resend', () => {
       /* Письма портала намеренно текстовые: их читают в почтовом клиенте
          подписчика, а не в браузере, и вёрстка здесь только мешает. */
       assert.equal(captured[0]!.body.html, undefined)
+    })
+  })
+
+  it('на зарезервированный домен письмо не уходит вовсе', async () => {
+    await withStand({}, async (captured) => {
+      /* Демонстрационные данные живут на example.com (RFC 2606), и такой
+         адрес не принимает почту в принципе. Настоящая попытка отправки —
+         это гарантированный отскок, а доля отскоков решает, попадут ли
+         следующие письма в ящик или в спам. */
+      const result = await send({ ...letter, to: 'voter.7@example.com' })
+
+      assert.equal(result.ok, true, 'письмо должно считаться разобранным')
+      assert.equal(captured.length, 0, 'запрос всё-таки ушёл в канал')
+
+      /* Живой адрес по-прежнему уходит: правило про домен, а не про канал. */
+      await send(letter)
+      assert.equal(captured.length, 1)
     })
   })
 })

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -24,6 +25,7 @@ export function stateFor(account: Account): string {
 }
 
 export default async function globalSetup(config: FullConfig) {
+  warnAboutForeignServer()
   execFileSync('pnpm', ['db:seed'], { stdio: 'inherit' })
 
   /* Ящик чистим здесь: письма прошлых прогонов сбивают поиск свежей
@@ -45,4 +47,25 @@ export default async function globalSetup(config: FullConfig) {
   } finally {
     await browser.close()
   }
+}
+
+/**
+ * Предупреждение про уже запущенный дев-сервер.
+ *
+ * Playwright поднимает свой с `MAIL_PROVIDER=file`, но при
+ * `reuseExistingServer` переиспользует чужой — со всеми его настройками.
+ * Если тот запущен с настоящим каналом, ссылки входа уйдут почтой, а не
+ * в `.data/mail`, и прогон упадёт на первом же сценарии входа. Причина
+ * при этом выглядит как «письмо не пришло», а не как «сервер не тот».
+ */
+function warnAboutForeignServer() {
+  if (existsSync('.env')) process.loadEnvFile('.env')
+  const provider = process.env.MAIL_PROVIDER?.trim()
+  if (!provider || provider === 'file' || provider === 'log') return
+
+  console.warn(
+    `\n⚠ MAIL_PROVIDER=${provider}. Свой сервер Playwright поднимет с file, ` +
+      'но уже запущенный переиспользует как есть — остановите его перед прогоном,\n' +
+      '  иначе ссылки входа уйдут настоящей почтой и сценарии входа упадут.\n',
+  )
 }

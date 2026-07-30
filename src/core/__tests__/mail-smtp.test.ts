@@ -184,14 +184,14 @@ describe('доставка через SMTP', () => {
       })
 
       const result = await send({
-        to: 'author@example.com',
+        to: 'author@ritmika.app',
         subject: 'Проверка доставки',
         text: 'Тело письма.',
       })
 
       assert.equal(result.ok, true)
       assert.equal(received.length, 1)
-      assert.deepEqual(received[0]?.to, ['author@example.com'])
+      assert.deepEqual(received[0]?.to, ['author@ritmika.app'])
       assert.equal(received[0]?.from, 'feedback@example.com')
       /* Тема в письме закодирована — кириллица не проходит по SMTP как есть. */
       assert.match(received[0]?.body ?? '', /Subject:.+/)
@@ -212,7 +212,7 @@ describe('доставка через SMTP', () => {
       })
 
       await send({
-        to: 'author@example.com',
+        to: 'author@ritmika.app',
         subject: 'Тема',
         text: 'Обращение перешло в статус «Запланировано».',
       })
@@ -242,7 +242,7 @@ describe('доставка через SMTP', () => {
         MAIL_FROM: undefined,
       })
 
-      const result = await send({ to: 'author@example.com', subject: 'Тема', text: 'Тело.' })
+      const result = await send({ to: 'author@ritmika.app', subject: 'Тема', text: 'Тело.' })
       assert.equal(result.ok, true)
       assert.equal(received.length, 1)
     })
@@ -260,7 +260,7 @@ describe('доставка через SMTP', () => {
         MAIL_FROM: undefined,
       })
 
-      const result = await send({ to: 'author@example.com', subject: 'Тема', text: 'Тело.' })
+      const result = await send({ to: 'author@ritmika.app', subject: 'Тема', text: 'Тело.' })
       /* Тихий успех здесь означал бы, что портал считает письмо доставленным,
          а человек его не получил — и повтора не будет. */
       assert.equal(result.ok, false)
@@ -268,7 +268,7 @@ describe('доставка через SMTP', () => {
   })
 
   it('отвергнутый адресат — не успех', async () => {
-    await withServer({ rejectRecipient: 'ghost@example.com' }, async (port) => {
+    await withServer({ rejectRecipient: 'ghost@ritmika.app' }, async (port) => {
       restore = withEnv({
         MAIL_PROVIDER: 'smtp',
         SMTP_HOST: '127.0.0.1',
@@ -279,7 +279,7 @@ describe('доставка через SMTP', () => {
         MAIL_FROM: 'feedback@example.com',
       })
 
-      const result = await send({ to: 'ghost@example.com', subject: 'Тема', text: 'Тело.' })
+      const result = await send({ to: 'ghost@ritmika.app', subject: 'Тема', text: 'Тело.' })
       assert.equal(result.ok, false)
     })
   })
@@ -299,7 +299,7 @@ describe('доставка через SMTP', () => {
 
     /* Отправка обязана вернуть отказ, а не бросить: у вызывающего кода уже
        сменился статус обращения, и падение из-за почты его откатит. */
-    const result = await send({ to: 'author@example.com', subject: 'Тема', text: 'Тело.' })
+    const result = await send({ to: 'author@ritmika.app', subject: 'Тема', text: 'Тело.' })
     assert.equal(result.ok, false)
     resetSmtpTransport()
   })

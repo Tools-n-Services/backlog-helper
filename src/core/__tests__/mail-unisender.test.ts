@@ -91,7 +91,7 @@ async function closedPort(): Promise<number> {
 }
 
 const letter = {
-  to: 'author@example.com',
+  to: 'author@ritmika.app',
   subject: 'Обращение перешло в статус «Запланировано»',
   text: 'Тело письма с кириллицей.',
 }
@@ -225,7 +225,7 @@ describe('ответы Unisender Go', () => {
         status: 200,
         json: {
           status: 'success',
-          failed_emails: { 'author@example.com': 'unsubscribed' },
+          failed_emails: { 'author@ritmika.app': 'unsubscribed' },
         },
       },
       async () => {
@@ -233,7 +233,7 @@ describe('ответы Unisender Go', () => {
            означало бы потерянное письмо без повтора. */
         const result = await send(letter)
         assert.equal(result.ok, false)
-        if (!result.ok) assert.match(result.error, /author@example\.com — unsubscribed/)
+        if (!result.ok) assert.match(result.error, /author@ritmika\.app — unsubscribed/)
       },
     )
   })

@@ -70,11 +70,15 @@ const JOBS: Job[] = [
       const replies = await dispatchReplies(origin)
 
       const letters = statuses.letters + replies.letters
+      const skipped = statuses.skipped + replies.skipped
       const failed = statuses.failed + replies.failed
-      if (statuses.changes + replies.replies + letters + failed === 0) return null
+      if (statuses.changes + replies.replies + letters + skipped + failed === 0) return null
 
       return (
         `переходов: ${statuses.changes}, ответов: ${replies.replies}, писем: ${letters}` +
+        /* Пропущенные адреса — отдельным числом: сложенные с отправленными,
+           они рапортуют о сотнях писем, которых никто не получал. */
+        (skipped > 0 ? `, пропущено демо-адресов: ${skipped}` : '') +
         (failed > 0 ? `, не доставлено: ${failed} (повторим)` : '')
       )
     },

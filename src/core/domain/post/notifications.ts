@@ -61,6 +61,8 @@ export async function pendingNotifications(limit = BATCH) {
 export interface DispatchResult {
   changes: number
   letters: number
+  /** Адресаты, которым канал отказался писать намеренно (демонстрационные). */
+  skipped: number
   failed: number
 }
 
@@ -73,7 +75,7 @@ export interface DispatchResult {
  */
 export async function dispatchNotifications(origin: string): Promise<DispatchResult> {
   const changes = await pendingNotifications()
-  const result: DispatchResult = { changes: 0, letters: 0, failed: 0 }
+  const result: DispatchResult = { changes: 0, letters: 0, skipped: 0, failed: 0 }
 
   for (const change of changes) {
     const status = statusByKey.get(change.toStatus.key)
@@ -120,8 +122,9 @@ export async function dispatchNotifications(origin: string): Promise<DispatchRes
             note: change.note,
             unsubscribeUrl,
           })
-      if (sent.ok) result.letters++
-      else failures++
+      if (!sent.ok) failures++
+      else if (sent.skipped) result.skipped++
+      else result.letters++
     }
 
     if (failures === 0) {
@@ -191,12 +194,14 @@ function replyRecipientId(reply: Awaited<ReturnType<typeof pendingReplies>>[numb
 export interface ReplyDispatchResult {
   replies: number
   letters: number
+  /** Адресаты, которым канал отказался писать намеренно (демонстрационные). */
+  skipped: number
   failed: number
 }
 
 export async function dispatchReplies(origin: string): Promise<ReplyDispatchResult> {
   const replies = await pendingReplies()
-  const result: ReplyDispatchResult = { replies: 0, letters: 0, failed: 0 }
+  const result: ReplyDispatchResult = { replies: 0, letters: 0, skipped: 0, failed: 0 }
 
   for (const reply of replies) {
     const recipientId = replyRecipientId(reply)
@@ -244,7 +249,8 @@ export async function dispatchReplies(origin: string): Promise<ReplyDispatchResu
     if (sent.ok) {
       await markReplySent(reply.id)
       result.replies++
-      result.letters++
+      if (sent.skipped) result.skipped++
+      else result.letters++
     } else {
       result.failed++
     }
