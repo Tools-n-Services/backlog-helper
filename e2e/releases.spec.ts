@@ -56,6 +56,39 @@ test.describe('от имени команды', () => {
     await expect(draft.getByRole('button', { name: 'Опубликовать' })).toBeVisible()
   })
 
+  test('релиз собирается на портале: черновик, изменение, обращение', async ({ page }) => {
+    await page.goto('/admin/releases')
+    await page.getByRole('link', { name: 'Завести релиз' }).click()
+
+    const title = `Проверка e2e: релиз ${Date.now()}`
+    await page.getByLabel('Заголовок').fill(title)
+    await page.getByLabel('Версия').fill('9.1')
+    await page.getByLabel('Вводка').fill('Проверка сборки записи на портале.')
+    await page.getByRole('button', { name: 'Создать черновик' }).click()
+
+    await expect(page.getByRole('heading', { name: title })).toBeVisible()
+    await expect(page.getByText('черновик без срока')).toBeVisible()
+
+    /* Изменение со своим типом: без него запись не попадёт ни под один
+       фильтр ленты (FR-162). */
+    await page.getByPlaceholder('Что изменилось — одной строкой').fill('Ночные смены в отчёте')
+    await page.getByRole('button', { name: 'Добавить' }).click()
+    await expect(page.getByText('Ночные смены в отчёте')).toBeVisible()
+
+    /* И то, ради чего всё: обращения, которые публикация закроет. */
+    await page.getByPlaceholder('Привязать обращение').fill('выгруз')
+    const candidate = page.locator('main button').filter({ hasText: 'выгруз' }).first()
+    await expect(candidate).toBeVisible()
+    const linked = (await candidate.innerText()).split('\n')[0]!
+    await candidate.click()
+
+    await expect(page.getByRole('link', { name: linked })).toBeVisible()
+
+    /* Черновик виден в списке готовящихся — вместе с тем, что он закроет. */
+    await page.goto('/admin/releases')
+    await expect(page.getByRole('link', { name: title })).toBeVisible()
+  })
+
   test('черновик не открывается на портале до срока', async ({ page }) => {
     const response = await page.goto('/changelog/release-2-31')
     /* Ссылка на запись предсказуема по версии продукта: анонс не должен

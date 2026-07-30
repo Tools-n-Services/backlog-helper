@@ -310,6 +310,11 @@ export interface ChangelogResult {
  * и сколько людей получит письмо. Публикация — единственное действие портала,
  * которое рассылает хорошие новости, и единственное, которое нельзя отозвать.
  */
+/** Связанное обращение в редакторе: с идентификатором — его отвязывают. */
+export interface ReleasePostLink extends ChangelogPostLink {
+  id: string
+}
+
 export interface ReleaseAdminView {
   id: string
   slug: string
@@ -321,7 +326,7 @@ export interface ReleaseAdminView {
   scheduledLabel: string | null
   changeCount: number
   /** Обращения, которые закроет публикация. */
-  posts: ChangelogPostLink[]
+  posts: ReleasePostLink[]
   /**
    * Верхняя оценка числа писем: по одному на живую подписку связанных
    * обращений. Настройки уведомлений часть из них отсекут.
@@ -334,6 +339,27 @@ export interface ReleasesView {
   pending: ReleaseAdminView[]
   /** Последние опубликованные: подтверждение, что цикл замкнулся. */
   published: ReleaseAdminView[]
+}
+
+/** Изменение внутри записи — с идентификатором: его правят и убирают. */
+export interface ReleaseChangeView extends ChangelogChangeView {
+  id: string
+}
+
+/**
+ * Запись в редакторе.
+ *
+ * Отличается от публичного вида тем, что показывает незаполненное: черновик
+ * без изменений, без вводки и без срока — рабочее состояние на полпути,
+ * а не ошибка.
+ */
+export interface ReleaseDetailView extends ReleaseAdminView {
+  lead: string
+  labels: string[]
+  changes: ReleaseChangeView[]
+  /** Для поля ввода: `YYYY-MM-DDTHH:mm` в местном времени. */
+  scheduledInput: string | null
+  published: boolean
 }
 
 /* ─────────────────────────── Профиль ─────────────────────────── */
@@ -615,4 +641,6 @@ export interface QueryPort {
   getBacklogLinksForPost(postId: string): Promise<BacklogLinkView[]>
   /** Релизы глазами команды: что закроет публикация (FR-165). */
   getReleases(): Promise<ReleasesView>
+  /** Запись в редакторе: поля, изменения и привязанные обращения. */
+  getRelease(id: string): Promise<ReleaseDetailView | null>
 }

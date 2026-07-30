@@ -22,6 +22,7 @@ import type { BacklogKind } from '@/generated/prisma/enums'
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/core/db'
 import { insightSourceName } from '@/core/domain/backlog/insights'
+import { changeKindName, changeKinds } from '@/core/domain/changelog/kinds'
 import { autoPriority } from '@/core/domain/triage/priority'
 import { slaState } from '@/core/domain/triage/sla'
 import {
@@ -53,6 +54,7 @@ import type {
   ProfileView,
   QueryPort,
   ReleaseAdminView,
+  ReleaseDetailView,
   ReleasesView,
   RoadmapView,
   SimilarPostView,
@@ -679,11 +681,11 @@ export const dbQueries: QueryPort = {
       items: await Promise.all(page.map((e) => toEntryView(e))),
       nextCursor: hasMore ? encodeCursor(page.at(-1)!.id) : null,
       total,
-      kindFacets: (Object.keys(CHANGE_KIND_NAMES) as ChangeKind[])
-        .map((kind) => ({
-          key: kind,
-          name: CHANGE_KIND_NAMES[kind],
-          count: kindCounts.get(kind) ?? 0,
+      kindFacets: changeKinds
+        .map(({ key }) => ({
+          key,
+          name: changeKindName(key),
+          count: kindCounts.get(key) ?? 0,
         }))
         .filter((f) => f.count > 0),
       labelFacets: [...labelCounts.entries()]
@@ -742,6 +744,47 @@ export const dbQueries: QueryPort = {
     return {
       pending: pending.map((r) => toReleaseView(r, byPost)),
       published: published.map((r) => toReleaseView(r, byPost)),
+    }
+  },
+
+  async getRelease(id: string): Promise<ReleaseDetailView | null> {
+    if (!isUuid(id)) return null
+
+    const row = await prisma.changelogEntry.findUnique({
+      where: { id },
+      select: {
+        ...releaseSelect,
+        lead: true,
+        labels: true,
+        changes: {
+          orderBy: { position: 'asc' },
+          select: { id: true, kind: true, title: true, body: true },
+        },
+      },
+    })
+    if (!row) return null
+
+    const postIds = row.posts.map((p) => p.post.id)
+    const subscriptions = postIds.length
+      ? await prisma.subscription.groupBy({
+          by: ['postId'],
+          where: { postId: { in: postIds }, unsubscribedAt: null },
+          _count: { _all: true },
+        })
+      : []
+
+    return {
+      ...toReleaseView(row, new Map(subscriptions.map((s) => [s.postId, s._count._all]))),
+      lead: row.lead,
+      labels: row.labels,
+      changes: row.changes.map((c) => ({
+        id: c.id,
+        kind: c.kind as ChangeKind,
+        title: c.title,
+        body: c.body,
+      })),
+      scheduledInput: row.scheduledFor ? inputMoment(row.scheduledFor) : null,
+      published: row.publishedAt !== null,
     }
   },
 
@@ -1224,12 +1267,6 @@ function decimal(value: Prisma.Decimal | null): number | null {
   return value === null ? null : Number(value)
 }
 
-const CHANGE_KIND_NAMES: Record<ChangeKind, string> = {
-  new: 'Новое',
-  improved: 'Улучшено',
-  fixed: 'Исправлено',
-}
-
 const entrySelect = {
   id: true,
   slug: true,
@@ -1335,6 +1372,21 @@ const releaseSelect = {
   },
 } as const
 
+/**
+ * Момент для поля ввода `datetime-local`: `YYYY-MM-DDTHH:mm`.
+ *
+ * В местном времени, а не в UTC: человек ставит дату релиза по своим часам,
+ * и подставленное на три часа раньше значение он либо не заметит, либо
+ * исправит — и оба исхода плохи.
+ */
+function inputMoment(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+    `T${pad(at.getHours())}:${pad(at.getMinutes())}`
+  )
+}
+
 /** Дата со временем: у отложенной публикации важен час, а не только день. */
 function momentLabel(at: Date): string {
   return new Intl.DateTimeFormat('ru-RU', {
@@ -1378,6 +1430,7 @@ function toReleaseView(
     changeCount: row._count.changes,
     posts: row.posts
       .map(({ post }) => ({
+        id: post.id,
         slug: post.slug,
         boardSlug: post.board.slug,
         title: post.title,

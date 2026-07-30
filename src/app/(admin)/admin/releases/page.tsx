@@ -39,7 +39,15 @@ export default async function ReleasesPage() {
 
   return (
     <div className="mx-auto max-w-[62rem] px-4 py-6">
-      <h1 className="mb-1 text-h3 font-bold text-ink">Релизы</h1>
+      <div className="mb-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h1 className="text-h3 font-bold text-ink">Релизы</h1>
+        <Link
+          href="/admin/releases/new"
+          className="ml-auto rounded-pill bg-ink px-4 py-1.5 text-small font-semibold text-surface hover:bg-ink-hover"
+        >
+          Завести релиз
+        </Link>
+      </div>
       <p className="mb-6 max-w-[70ch] text-small text-muted">
         Публикация закрывает связанные обращения и отправляет их авторам
         и голосовавшим письмо «то, что вы просили, вышло». Это единственная
@@ -57,8 +65,8 @@ export default async function ReleasesPage() {
 
         {pending.length === 0 ? (
           <p className="rounded-card border border-line bg-surface px-4 py-8 text-center text-small text-muted">
-            Черновиков нет. Запись создаётся вместе с релизом — сидом,
-            импортом или скриптом выкладки; здесь она публикуется.
+            Черновиков нет. Запись заводится заранее и лежит здесь, пока
+            не выйдет: «Завести релиз» — и можно собирать список изменений.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -83,10 +91,16 @@ export default async function ReleasesPage() {
                 className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2"
               >
                 <Link
-                  href={`/changelog/${entry.slug}` as Route}
+                  href={`/admin/releases/${entry.id}` as Route}
                   className="text-small font-semibold text-ink hover:underline"
                 >
                   {entry.title}
+                </Link>
+                <Link
+                  href={`/changelog/${entry.slug}` as Route}
+                  className="text-small text-muted hover:text-ink"
+                >
+                  на портале
                 </Link>
                 {entry.version && (
                   <span className="tnum text-small text-muted">{entry.version}</span>
@@ -116,7 +130,11 @@ function ReleaseCard({
   return (
     <article className="rounded-card border border-line bg-surface p-4">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="text-body font-bold text-ink">{entry.title}</h3>
+        <h3 className="text-body font-bold text-ink">
+          <Link href={`/admin/releases/${entry.id}` as Route} className="hover:underline">
+            {entry.title}
+          </Link>
+        </h3>
         {entry.version && <span className="tnum text-small text-muted">{entry.version}</span>}
         <span className="text-small text-faint">
           {entry.changeCount > 0
