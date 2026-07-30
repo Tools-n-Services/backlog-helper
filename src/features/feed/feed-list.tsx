@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
-import { formatCount } from '@/core/content'
+import { fill, formatCount, type Dictionary, type Locale } from '@/core/content'
 import { PostCard } from '@/ui/feed/post-card'
 import type { FeedPage, FeedQuery, PostCardView } from '@/queries/types'
 
@@ -16,10 +16,16 @@ export function FeedList({
   query,
   initial,
   signedIn,
+  t,
+  lang,
 }: {
   query: FeedQuery
   initial: FeedPage
   signedIn: boolean
+  /* Словарь приходит с сервера: дозагруженные карточки рисуются уже
+     в браузере, и второй раз спросить язык там не у кого. */
+  t: Dictionary
+  lang: Locale
 }) {
   const [items, setItems] = useState<PostCardView[]>(initial.items)
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor)
@@ -37,7 +43,7 @@ export function FeedList({
         setItems((prev) => [...prev, ...page.items])
         setCursor(page.nextCursor)
       } catch {
-        setError('Не удалось загрузить продолжение ленты.')
+        setError(t.feed.loadError)
       }
     })
   }
@@ -47,7 +53,7 @@ export function FeedList({
       <ul className="space-y-2.5">
         {items.map((post) => (
           <li key={post.id}>
-            <PostCard post={post} signedIn={signedIn} />
+            <PostCard post={post} signedIn={signedIn} t={t} lang={lang} />
           </li>
         ))}
       </ul>
@@ -60,7 +66,7 @@ export function FeedList({
             onClick={more}
             className="rounded-pill bg-ink px-4 py-1.5 text-small font-semibold text-surface"
           >
-            Повторить
+            {t.common.retry}
           </button>
         </div>
       )}
@@ -73,10 +79,15 @@ export function FeedList({
             disabled={pending}
             className="rounded-pill border border-line bg-surface px-5 py-2.5 text-body font-semibold text-ink transition-colors hover:bg-track disabled:opacity-60"
           >
-            {pending ? 'Загружаем…' : `Показать ещё ${formatCount(remaining)}`}
+            {pending
+              ? t.feed.loading
+              : fill(t.feed.loadMoreCount, { count: formatCount(remaining, lang) })}
           </button>
           <span className="font-mono text-label uppercase text-faint">
-            показано {formatCount(items.length)} из {formatCount(initial.total)}
+            {fill(t.feed.shownOf, {
+              shown: formatCount(items.length, lang),
+              total: formatCount(initial.total, lang),
+            })}
           </span>
         </div>
       )}

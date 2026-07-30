@@ -4,7 +4,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 
-import { formatCount, plural } from '@/core/content'
+import {
+  fill,
+  formatCount,
+  localized,
+  localizedForms,
+  plural,
+  type Locale,
+} from '@/core/content'
 import type { PostTypeView } from '@/queries/types'
 
 import { voteAction } from './actions'
@@ -27,6 +34,8 @@ export function VoteControl({
   voted: initialVoted,
   signedIn,
   variant = 'card',
+  lang = 'ru',
+  labels,
 }: {
   postId: string
   count: number
@@ -34,6 +43,18 @@ export function VoteControl({
   voted: boolean
   signedIn: boolean
   variant?: 'card' | 'page'
+  lang?: Locale
+  /**
+   * Подписи приходят пропом, а не читаются из словаря внутри: компонент
+   * клиентский, и тащить в браузер оба словаря целиком ради четырёх строк
+   * незачем.
+   */
+  labels: {
+    noVotes: string
+    youVoted: string
+    aria: string
+    ariaSignIn: string
+  }
 }) {
   const router = useRouter()
   const [voted, setVoted] = useState(initialVoted)
@@ -90,25 +111,27 @@ export function VoteControl({
           —
         </span>
         <span className="mt-0.5 text-[11px] leading-tight text-faint">
-          без голосов
+          {labels.noVotes}
         </span>
       </div>
     )
   }
 
-  const label = `${formatCount(shown)} ${plural(shown, type.countLabel)}`
+  const forms = localizedForms(type.countLabel, type.countLabelEn, lang)
+  const action = localized(type.voteLabel, type.voteLabelEn, lang)
+  const label = `${formatCount(shown, lang)} ${plural(shown, forms, lang)}`
 
   /* Не авторизован — ведёт на вход, а не молчит (07-ui-brief.md, раздел 4). */
   if (!signedIn) {
     return (
       <Link
         href="/login"
-        aria-label={`${type.voteLabel}. Сейчас ${label}. Нужен вход`}
+        aria-label={fill(labels.ariaSignIn, { action, count: label })}
         className={`${shell} border-line bg-surface text-ink hover:border-ink`}
       >
         <Chevron />
         <Count value={shown} wide={wide} />
-        <Caption>{plural(shown, type.countLabel)}</Caption>
+        <Caption>{plural(shown, forms, lang)}</Caption>
       </Link>
     )
   }
@@ -118,7 +141,7 @@ export function VoteControl({
       type="button"
       onClick={submit}
       aria-pressed={voted}
-      aria-label={`${type.voteLabel}. Сейчас ${label}`}
+      aria-label={fill(labels.aria, { action, count: label })}
       className={
         `${shell} ` +
         (voted
@@ -129,7 +152,7 @@ export function VoteControl({
       <Chevron />
       <Count value={shown} wide={wide} />
       <Caption tone={voted ? 'on' : 'off'}>
-        {voted ? 'вы за' : plural(shown, type.countLabel)}
+        {voted ? labels.youVoted : plural(shown, forms, lang)}
       </Caption>
     </button>
   )

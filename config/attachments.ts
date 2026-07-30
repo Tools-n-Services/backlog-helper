@@ -16,6 +16,8 @@ export type AttachmentKindKey = 'image' | 'video' | 'log' | 'har' | 'other'
 export interface AttachmentRule {
   kind: AttachmentKindKey
   name: string
+  /** Название на английском (FR-181). Пусто — показываем основное. */
+  nameEn?: string
   /** Точные MIME-типы, которые принимаем. */
   mimes: string[]
   /** Расширения, по которым уточняем тип: HAR приходит как обычный json. */
@@ -38,18 +40,21 @@ export const attachmentRules: AttachmentRule[] = [
   {
     kind: 'image',
     name: 'Изображение',
+    nameEn: 'Image',
     mimes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
     maxBytes: 10 * MB,
   },
   {
     kind: 'video',
     name: 'Видео',
+    nameEn: 'Video',
     mimes: ['video/mp4', 'video/webm'],
     maxBytes: 50 * MB,
   },
   {
     kind: 'log',
     name: 'Лог',
+    nameEn: 'Log',
     mimes: ['text/plain', 'text/csv', 'application/json', 'application/x-ndjson'],
     extensions: ['.log', '.txt', '.json', '.csv'],
     maxBytes: 5 * MB,

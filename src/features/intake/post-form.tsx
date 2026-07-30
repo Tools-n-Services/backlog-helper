@@ -4,6 +4,13 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useState, useTransition } from 'react'
 
+import {
+  fill,
+  localized,
+  plural,
+  type Dictionary,
+  type Locale,
+} from '@/core/content'
 import { formatWait } from '@/core/domain/intake/rate-limit'
 import { isSearchable } from '@/core/domain/intake/similar'
 import type { FieldErrors, FormValues } from '@/core/domain/intake/validate'
@@ -25,9 +32,16 @@ const SIMILAR_DEBOUNCE_MS = 300
 export function PostForm({
   board,
   type,
+  t,
+  lang,
+  translating = false,
 }: {
   board: BoardView
   type: PostTypeConfig
+  t: Dictionary
+  lang: Locale
+  /** Перевод включён — обещаем его человеку прямо у кнопки (FR-181). */
+  translating?: boolean
 }) {
   const [values, setValues] = useState<FormValues>({})
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -103,14 +117,15 @@ export function PostForm({
         refCode={result.ref}
         slug={result.slug}
         moderated={result.moderated}
+        t={t}
       />
     )
   }
   if (result && !result.ok && result.kind === 'rate-limit') {
-    return <LimitReached board={board} limit={result} />
+    return <LimitReached board={board} limit={result} t={t} lang={lang} />
   }
   if (result && !result.ok && result.kind === 'auth') {
-    return <NeedsAccess board={board} reason={result.reason} />
+    return <NeedsAccess board={board} reason={result.reason} t={t} />
   }
 
   const errorList = Object.entries(errors)
@@ -124,12 +139,12 @@ export function PostForm({
           style={{ borderColor: 'var(--color-signal-error)' }}
         >
           <p className="text-body font-semibold text-ink">
-            Не хватает {errorList.length === 1 ? 'одного поля' : 'нескольких полей'}
+            {errorList.length === 1 ? t.intake.missingOne : t.intake.missingMany}
           </p>
           <ul className="mt-1 space-y-0.5">
             {errorList.map(([name, message]) => (
               <li key={name} className="text-small text-muted">
-                {type.formSchema.find((f) => f.name === name)?.label ?? name}: {message}
+                {fieldLabel(type, name, lang)}: {message}
               </li>
             ))}
           </ul>
@@ -147,11 +162,18 @@ export function PostForm({
             }
             error={errors[field.name]}
             onChange={set(field.name)}
+            t={t}
+            lang={lang}
           />
           {/* Похожие показываются сразу под заголовком: позже человек уже
               вложился в текст и не откажется от своего обращения. */}
           {field.name === titleField?.name && (
-            <SimilarInset candidates={shownCandidates} searching={searching} />
+            <SimilarInset
+              candidates={shownCandidates}
+              searching={searching}
+              t={t}
+              lang={lang}
+            />
           )}
         </div>
       ))}
@@ -162,10 +184,10 @@ export function PostForm({
             htmlFor="field-category"
             className="mb-1.5 block text-body font-semibold text-ink"
           >
-            Категория
+            {t.intake.category}
             {!board.requireCategory && (
               <span className="ml-2 text-small font-normal text-faint">
-                необязательно
+                {t.intake.optional}
               </span>
             )}
           </label>
@@ -176,7 +198,7 @@ export function PostForm({
             aria-invalid={Boolean(errors['category'])}
             className="w-full rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2"
           >
-            <option value="">Не выбрана</option>
+            <option value="">{t.intake.categoryNotSelected}</option>
             {board.categories.map((category) => (
               <option key={category.slug} value={category.slug}>
                 {category.name}
@@ -200,14 +222,19 @@ export function PostForm({
           disabled={pending}
           className="rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface transition-colors hover:bg-ink-hover disabled:opacity-60"
         >
-          {pending ? 'Отправляем…' : 'Отправить обращение'}
+          {pending ? t.intake.submitting : t.intake.submit}
         </button>
         <Link
           href={`/${board.slug}/new`}
           className="text-small text-muted underline underline-offset-2 hover:text-ink"
         >
-          Сменить тип
+          {t.intake.changeType}
         </Link>
+        {/* Автоперевод — не сюрприз: человек должен знать, что его текст
+            прочитают на другом языке, до того как нажмёт «Отправить». */}
+        {translating && (
+          <p className="basis-full text-small text-faint">{t.intake.autoTranslate}</p>
+        )}
       </div>
     </form>
   )
@@ -224,19 +251,19 @@ export function PostForm({
 function NeedsAccess({
   board,
   reason,
+  t,
 }: {
   board: BoardView
   reason: 'unauthorized' | 'banned'
+  t: Dictionary
 }) {
   return (
     <div className="rounded-card border border-line bg-surface px-6 py-10 text-center">
       <h2 className="text-h3 font-bold text-ink">
-        {reason === 'banned' ? 'Аккаунт заблокирован' : 'Нужен вход'}
+        {reason === 'banned' ? t.intake.bannedTitle : t.intake.needSignInTitle}
       </h2>
       <p className="mx-auto mt-2 max-w-[48ch] text-body text-muted">
-        {reason === 'banned'
-          ? 'Создавать обращения с заблокированного аккаунта нельзя. Читать портал при этом можно.'
-          : 'Обращение подписывается вашим именем — команда должна знать, к кому вернуться с вопросом.'}
+        {reason === 'banned' ? t.intake.bannedLead : t.intake.needSignInLead}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {reason === 'unauthorized' && (
@@ -244,14 +271,14 @@ function NeedsAccess({
             href="/login"
             className="rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface"
           >
-            Войти
+            {t.nav.signIn}
           </Link>
         )}
         <Link
           href={`/${board.slug}`}
           className="rounded-pill border border-line px-5 py-2.5 text-small font-semibold text-ink-2"
         >
-          Читать обращения
+          {t.auth.readPosts}
         </Link>
       </div>
     </div>
@@ -263,20 +290,20 @@ function Sent({
   refCode,
   slug,
   moderated,
+  t,
 }: {
   board: BoardView
   refCode: string
   slug: string
   moderated: boolean
+  t: Dictionary
 }) {
   return (
     <div className="rounded-card border border-line bg-surface px-6 py-10 text-center">
       <p className="font-mono text-label uppercase text-faint">{refCode}</p>
-      <h2 className="mt-3 text-h3 font-bold text-ink">Обращение отправлено</h2>
+      <h2 className="mt-3 text-h3 font-bold text-ink">{t.intake.sentTitle}</h2>
       <p className="mx-auto mt-2 max-w-[48ch] text-body text-muted">
-        {moderated
-          ? 'Оно появится в ленте после проверки — обычно это занимает несколько часов. Мы напишем на почту, когда команда ответит или изменит статус.'
-          : 'Мы напишем на почту, когда команда ответит или изменит статус.'}
+        {moderated ? t.intake.sentModerated : t.intake.sentPlain}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {/* Обращение теперь существует по своему адресу — первым делом
@@ -285,13 +312,13 @@ function Sent({
           href={`/${board.slug}/p/${slug}` as Route}
           className="rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface"
         >
-          Открыть обращение
+          {t.intake.openPost}
         </Link>
         <Link
           href={`/${board.slug}`}
           className="rounded-pill border border-line px-5 py-2.5 text-small font-semibold text-ink-2"
         >
-          Вернуться к ленте
+          {t.intake.backToFeed}
         </Link>
       </div>
     </div>
@@ -305,29 +332,45 @@ function Sent({
 function LimitReached({
   board,
   limit,
+  t,
+  lang,
 }: {
   board: BoardView
   limit: { window: 'hour' | 'day'; limit: number; retryAfterMinutes: number }
+  t: Dictionary
+  lang: Locale
 }) {
-  const period = limit.window === 'hour' ? 'час' : 'сутки'
   return (
     <div className="rounded-card border border-line bg-surface px-6 py-10 text-center">
       <h2 className="text-h3 font-bold text-ink">
-        {limit.limit}{' '}
-        {limit.limit === 1 ? 'обращение' : limit.limit < 5 ? 'обращения' : 'обращений'} за{' '}
-        {period} — предел
+        {fill(t.intake.limitTitle, {
+          count: limit.limit,
+          label: plural(limit.limit, t.common.posts, lang),
+          period:
+            limit.window === 'hour' ? t.intake.limitPeriodHour : t.intake.limitPeriodDay,
+        })}
       </h2>
       <p className="mx-auto mt-2 max-w-[48ch] text-body text-muted">
-        Ограничение защищает ленту от случайных дублей. Можно продолжить через{' '}
-        {formatWait(limit.retryAfterMinutes)}. Если написать нужно прямо сейчас —
-        добавьте детали комментарием к существующему обращению.
+        {fill(t.intake.limitLead, {
+          wait: formatWait(limit.retryAfterMinutes, {
+            minutes: t.intake.waitMinutes,
+            hours: t.intake.waitHours,
+            hoursMinutes: t.intake.waitHoursMinutes,
+          }),
+        })}
       </p>
       <Link
         href={`/${board.slug}`}
         className="mt-6 inline-block rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface"
       >
-        Вернуться к ленте
+        {t.intake.backToFeed}
       </Link>
     </div>
   )
+}
+
+/** Подпись поля из схемы типа — на языке смотрящего. */
+function fieldLabel(type: PostTypeConfig, name: string, lang: Locale): string {
+  const field = type.formSchema.find((f) => f.name === name)
+  return field ? localized(field.label, field.labelEn, lang) : name
 }

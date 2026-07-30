@@ -18,6 +18,9 @@ export interface NotificationKindInfo {
   title: string
   /** Что именно придёт и как часто — иначе настройка не поддаётся оценке. */
   hint: string
+  /** То же по-английски (FR-181). */
+  titleEn?: string
+  hintEn?: string
 }
 
 export const NOTIFICATION_KINDS: NotificationKindInfo[] = [
@@ -25,11 +28,15 @@ export const NOTIFICATION_KINDS: NotificationKindInfo[] = [
     key: 'status',
     title: 'Смена статуса моих обращений',
     hint: 'Одно письмо на переход, с текстом решения команды. Внутренние этапы работы не рассылаются.',
+    titleEn: 'Status changes on my requests',
+    hintEn: 'One email per change, with the team\u2019s decision. Internal work stages are not mailed out.',
   },
   {
     key: 'replies',
     title: 'Ответы в обсуждении',
     hint: 'Когда команда или другой участник отвечает на ваше обращение или на ваш комментарий.',
+    titleEn: 'Replies in the discussion',
+    hintEn: 'When the team or another participant replies to your request or to your comment.',
   },
 ]
 

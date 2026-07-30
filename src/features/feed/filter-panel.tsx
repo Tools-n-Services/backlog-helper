@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useOptimistic, useTransition } from 'react'
 
-import { formatCount } from '@/core/content'
+import { formatCount, localized, type Dictionary, type Locale } from '@/core/content'
 import type { FeedFacets, FeedQuery } from '@/queries/types'
 
 import {
@@ -22,9 +22,13 @@ import {
 export function FilterPanel({
   query,
   facets,
+  t,
+  lang,
 }: {
   query: FeedQuery
   facets: FeedFacets
+  t: Dictionary
+  lang: Locale
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -43,19 +47,24 @@ export function FilterPanel({
   const groups: {
     dimension: FacetDimension
     title: string
-    items: { key: string; name: string; count: number }[]
+    items: { key: string; name: string; nameEn?: string; count: number }[]
     selected: string[]
   }[] = [
     {
       dimension: 'status',
-      title: 'Статус',
+      title: t.feed.filterStatus,
       items: facets.statuses,
       selected: shown.statusKeys,
     },
-    { dimension: 'type', title: 'Тип', items: facets.types, selected: shown.typeKeys },
+    {
+      dimension: 'type',
+      title: t.feed.filterType,
+      items: facets.types,
+      selected: shown.typeKeys,
+    },
     {
       dimension: 'category',
-      title: 'Категория',
+      title: t.feed.filterCategory,
       items: facets.categories,
       selected: shown.categorySlugs,
     },
@@ -85,7 +94,7 @@ export function FilterPanel({
                 }
                 className="text-small text-faint underline underline-offset-2 hover:text-ink"
               >
-                сбросить
+                {t.common.reset}
               </button>
             )}
           </legend>
@@ -103,10 +112,10 @@ export function FilterPanel({
                       className="size-4 shrink-0 accent-[var(--color-ink)]"
                     />
                     <span className="min-w-0 flex-1 truncate text-body text-ink-2">
-                      {item.name}
+                      {localized(item.name, item.nameEn, lang)}
                     </span>
                     <span className="tnum shrink-0 text-small text-faint">
-                      {formatCount(item.count)}
+                      {formatCount(item.count, lang)}
                     </span>
                   </label>
                 </li>
@@ -122,7 +131,7 @@ export function FilterPanel({
           onClick={() => go(clearFacets(shown))}
           className="rounded-pill border border-line px-4 py-2 text-small font-semibold text-ink-2 transition-colors hover:bg-track"
         >
-          Сбросить все фильтры
+          {t.feed.resetAll}
         </button>
       )}
     </div>

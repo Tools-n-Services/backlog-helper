@@ -115,12 +115,18 @@ function toTypeView(key: string): PostTypeView {
     nameEn: t.nameEn,
     allowsVotes: t.allowsVotes,
     voteLabel: t.voteLabel,
+    voteLabelEn: t.voteLabelEn,
     countLabel: t.countLabel,
+    countLabelEn: t.countLabelEn,
   }
 }
 
 function countLabelOf(key: string): [string, string, string] {
   return postTypeByKey.get(key)?.countLabel ?? ['голос', 'голоса', 'голосов']
+}
+
+function countLabelEnOf(key: string): [string, string, string] | undefined {
+  return postTypeByKey.get(key)?.countLabelEn
 }
 
 function initials(name: string): string {
@@ -265,6 +271,8 @@ const cardSelect = {
   slug: true,
   title: true,
   details: true,
+  sourceLocale: true,
+  translations: { select: { locale: true, title: true, body: true } },
   moderation: true,
   voteCount: true,
   commentCount: true,
@@ -285,6 +293,8 @@ type CardRow = {
   slug: string
   title: string
   details: string
+  sourceLocale: string | null
+  translations: { locale: string; title: string | null; body: string }[]
   moderation: string
   voteCount: number
   commentCount: number
@@ -308,6 +318,14 @@ function toCardView(row: CardRow, now: Date, votedIds: Set<string>): PostCardVie
     boardSlug: row.board.slug,
     title: row.title,
     excerpt: excerptOf(row.details),
+    sourceLocale: row.sourceLocale,
+    /* В карточке от перевода нужны заголовок и та же выжимка, что у оригинала:
+       полный текст карточка не показывает ни на одном языке. */
+    translations: row.translations.map((t) => ({
+      locale: t.locale,
+      title: t.title,
+      body: t.body ? [excerptOf(t.body)] : [],
+    })),
     type: toTypeView(row.type.key),
     status: toStatusView(row.status.key),
     categoryName: row.category?.name ?? null,
@@ -475,6 +493,8 @@ export const dbQueries: QueryPort = {
             createdAt: true,
             parentId: true,
             author: { select: { name: true, role: true, isTeam: true } },
+            sourceLocale: true,
+            translations: { select: { locale: true, title: true, body: true } },
           },
         },
         subscriptions: userId
@@ -521,6 +541,14 @@ export const dbQueries: QueryPort = {
       body: c.body,
       likeCount: c.likeCount,
       pinned: c.pinned,
+      sourceLocale: c.sourceLocale,
+      /* Комментарий отдаётся переводом целиком, одним куском: он и в оригинале
+         рисуется одним блоком с сохранением переносов. */
+      translations: c.translations.map((t) => ({
+        locale: t.locale,
+        title: null,
+        body: [t.body],
+      })),
       replies: (byParent.get(c.id) ?? [])
         .slice()
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
@@ -544,6 +572,13 @@ export const dbQueries: QueryPort = {
       ...toCardView(row, now, voted),
       ref: row.ref,
       details: row.details.split(/\n{2,}/).filter(Boolean),
+      /* На странице обращения перевод разбит абзацами так же, как оригинал:
+         в карточке ленты `toCardView` кладёт сюда только выжимку. */
+      translations: row.translations.map((t) => ({
+        locale: t.locale,
+        title: t.title,
+        body: t.body.split(/\n{2,}/).filter(Boolean),
+      })),
       author: toPerson(row.author),
       createdAt: row.createdAt.toISOString(),
       createdLabel: relativeLabel(row.createdAt, now),
@@ -679,20 +714,28 @@ export const dbQueries: QueryPort = {
             boardName: p.board.name,
             title: p.title,
             typeName: postTypeByKey.get(p.type.key)?.name ?? p.type.key,
+            typeNameEn: postTypeByKey.get(p.type.key)?.nameEn,
             categoryName: p.category?.name ?? null,
             count: p.voteCount,
             countLabel: countLabelOf(p.type.key),
+            countLabelEn: countLabelEnOf(p.type.key),
             eta: p.eta,
           })),
         }
       }),
     )
 
-    const boards = await prisma.board.findMany({
+    const boardRows = await prisma.board.findMany({
       where: { visibility: 'public' },
       orderBy: { position: 'asc' },
       select: { slug: true, name: true },
     })
+    /* Английское название доски живёт в конфиге, а не в базе: база отвечает
+       на вопрос «какие доски есть», конфиг — «как они называются». */
+    const boards = boardRows.map((b) => ({
+      ...b,
+      nameEn: product.boards.find((c) => c.slug === b.slug)?.nameEn,
+    }))
 
     return { columns, boards }
   },
@@ -1119,6 +1162,7 @@ export const dbQueries: QueryPort = {
           status: toStatusView(post.status.key),
           count: post.voteCount,
           countLabel: countLabelOf(post.type.key),
+          countLabelEn: countLabelEnOf(post.type.key),
         }))
         /* Самое востребованное сверху: по нему и решают, браться ли. */
         .sort((a, b) => b.count - a.count),
@@ -1420,6 +1464,7 @@ function toEntryView(
       status: toStatusView(post.status.key),
       count: post.voteCount,
       countLabel: countLabelOf(post.type.key),
+      countLabelEn: countLabelEnOf(post.type.key),
     })),
   }
 }
@@ -1514,6 +1559,7 @@ function toReleaseView(
         status: toStatusView(post.status.key),
         count: post.voteCount,
         countLabel: countLabelOf(post.type.key),
+        countLabelEn: countLabelEnOf(post.type.key),
       }))
       .sort((a, b) => b.count - a.count),
     letters: row.posts.reduce(
@@ -1575,15 +1621,20 @@ async function facetsFor(query: FeedQuery, matches: string[] | null) {
     ]),
   )
 
-  const facet = (key: string, name: string, count: number): FacetView => ({ key, name, count })
+  const facet = (
+    key: string,
+    name: string,
+    count: number,
+    nameEn?: string,
+  ): FacetView => ({ key, name, count, nameEn })
 
   return {
     statuses: statuses
-      .map((s) => facet(s.key, s.name, statusCounts.get(s.key) ?? 0))
+      .map((s) => facet(s.key, s.name, statusCounts.get(s.key) ?? 0, s.nameEn))
       .filter((f) => f.count > 0),
     types: postTypes
       .filter((t) => listedTypeKeys.includes(t.key))
-      .map((t) => facet(t.key, t.name, typeCounts.get(t.key) ?? 0))
+      .map((t) => facet(t.key, t.name, typeCounts.get(t.key) ?? 0, t.nameEn))
       .filter((f) => f.count > 0),
     categories: categoryRefs
       .map((c) => facet(c.slug, c.name, categoryCounts.get(c.slug) ?? 0))

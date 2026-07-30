@@ -56,9 +56,25 @@ export function checkRateLimit(
 }
 
 /** «через 2 ч 15 мин» — человеку нужно знать, сколько ждать, а не код ошибки. */
-export function formatWait(minutes: number): string {
-  if (minutes < 60) return `${minutes} мин`
+export function formatWait(
+  minutes: number,
+  /* Формы приходят снаружи (FR-181): «2 ч 15 мин» и «2 h 15 min» — одна
+     и та же величина на двух языках, и знать про язык этому модулю незачем. */
+  forms: { minutes: string; hours: string; hoursMinutes: string } = {
+    minutes: '{minutes} мин',
+    hours: '{hours} ч',
+    hoursMinutes: '{hours} ч {minutes} мин',
+  },
+): string {
+  const put = (template: string, values: Record<string, number>): string =>
+    template.replace(/\{(\w+)\}/g, (whole, key: string) =>
+      key in values ? String(values[key]) : whole,
+    )
+
+  if (minutes < 60) return put(forms.minutes, { minutes })
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
-  return rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`
+  return rest === 0
+    ? put(forms.hours, { hours })
+    : put(forms.hoursMinutes, { hours, minutes: rest })
 }

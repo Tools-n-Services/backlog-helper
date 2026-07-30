@@ -470,6 +470,14 @@ model Post {
   resolvedAt              DateTime?   @map("resolved_at") @db.Timestamptz(6)
   attachmentsPurgeAt      DateTime?   @map("attachments_purge_at") @db.Timestamptz(6)
 
+  /// Язык оригинала (FR-181). null — не определяли: так выглядят обращения,
+  /// написанные до появления второго языка.
+  sourceLocale      String?   @map("source_locale")
+  /// Очередь перевода: отметка о выполнении и счётчик попыток — теми же
+  /// полями, что очередь писем.
+  translatedAt      DateTime? @map("translated_at") @db.Timestamptz(6)
+  translateAttempts Int       @default(0) @map("translate_attempts") @db.SmallInt
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -499,6 +507,7 @@ model Post {
   backlogLinks  BacklogPost[]
   changelogLinks ChangelogPost[]
   insights      Insight[]
+  translations  Translation[]
 
   @@unique([boardId, slug])
   @@index([boardId, statusId])
@@ -543,6 +552,10 @@ model Comment {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   /// Письмо об этом ответе уже разослано. null — ждёт в очереди.
   notifiedAt DateTime? @map("notified_at") @db.Timestamptz(6)
+  /// Язык оригинала и очередь перевода (FR-181) — как у обращения.
+  sourceLocale      String?   @map("source_locale")
+  translatedAt      DateTime? @map("translated_at") @db.Timestamptz(6)
+  translateAttempts Int       @default(0) @map("translate_attempts") @db.SmallInt
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -552,9 +565,43 @@ model Comment {
   replies  Comment[]        @relation("CommentTree")
   likes    CommentLike[]
   mentions CommentMention[]
+  translations Translation[]
 
   @@index([postId, createdAt])
   @@map("comment")
+}
+
+/**
+ * Перевод обращения или комментария (FR-181).
+ *
+ * Хранится, а не считается на лету: каждый вызов провайдера стоит денег,
+ * а перевод не меняется, пока не изменён оригинал. Отдельная таблица, а не
+ * колонки `title_en`: языков может стать три, и колоночная схема потребует
+ * миграции на каждый новый.
+ *
+ * Владелец ровно один — это проверяет `translation_owner_chk` в миграции.
+ * Prisma такое ограничение описать не умеет, поэтому оно живёт только в SQL.
+ */
+model Translation {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String? @map("post_id") @db.Uuid
+  commentId String? @map("comment_id") @db.Uuid
+  /// Язык перевода, не оригинала.
+  locale    String
+  /// У комментария заголовка нет.
+  title     String?
+  body      String
+  /// Чем переведено: меняя провайдера, форк захочет знать, что переводить заново.
+  provider  String
+  model     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  /// Частичные уникальные индексы создаются миграцией 20260730180000:
+  /// в составном @@unique NULL не равен NULL, и дубль прошёл бы молча.
+  @@map("translation")
 }
 
 model CommentLike {

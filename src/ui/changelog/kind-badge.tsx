@@ -1,9 +1,13 @@
+import type { Dictionary } from '@/core/content'
 import type { ChangeKind } from '@/queries/types'
 
-export const KIND_NAMES: Record<ChangeKind, string> = {
-  new: 'Новое',
-  improved: 'Улучшено',
-  fixed: 'Исправлено',
+/** Названия типов изменений на языке смотрящего (FR-181). */
+export function kindNames(t: Dictionary): Record<ChangeKind, string> {
+  return {
+    new: t.changelog.kindNew,
+    improved: t.changelog.kindImproved,
+    fixed: t.changelog.kindFixed,
+  }
 }
 
 /**
@@ -12,7 +16,7 @@ export const KIND_NAMES: Record<ChangeKind, string> = {
  * Кодируется не цветом: «Новое» — заливка, остальные — контур и вес.
  * В оттенках серого разница обязана оставаться (07-ui-brief.md, раздел 2).
  */
-export function KindBadge({ kind }: { kind: ChangeKind }) {
+export function KindBadge({ kind, t }: { kind: ChangeKind; t: Dictionary }) {
   const style =
     kind === 'new'
       ? 'bg-ink text-surface'
@@ -24,7 +28,7 @@ export function KindBadge({ kind }: { kind: ChangeKind }) {
     <span
       className={`inline-flex shrink-0 items-center rounded-pill px-2.5 py-0.5 font-mono text-label uppercase ${style}`}
     >
-      {KIND_NAMES[kind]}
+      {kindNames(t)[kind]}
     </span>
   )
 }

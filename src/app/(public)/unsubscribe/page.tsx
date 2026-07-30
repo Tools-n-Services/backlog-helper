@@ -1,14 +1,16 @@
 import type { Metadata } from 'next'
 
+import { fill } from '@/core/content'
+import { content } from '@/core/locale'
 import {
   PrimaryAction,
   SecondaryAction,
   StateScreen,
 } from '@/ui/layout/state-screen'
 
-export const metadata: Metadata = {
-  title: 'Отписка',
-  robots: { index: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await content()
+  return { title: t.unsubscribe.title, robots: { index: false } }
 }
 
 /**
@@ -21,46 +23,43 @@ export const metadata: Metadata = {
 export default async function UnsubscribePage({
   searchParams,
 }: PageProps<'/unsubscribe'>) {
-  const { post, status } = await searchParams
+  const [{ post, status }, t] = await Promise.all([searchParams, content()])
   const postTitle = Array.isArray(post) ? post[0] : post
   const unknown = (Array.isArray(status) ? status[0] : status) === 'unknown'
 
   if (unknown) {
     return (
       <StateScreen
-        title="Ссылка не подошла"
+        title={t.unsubscribe.failedTitle}
         actions={
           <>
-            <PrimaryAction href="/profile">Настроить письма</PrimaryAction>
-            <SecondaryAction href="/">Вернуться на портал</SecondaryAction>
+            <PrimaryAction href="/profile">{t.unsubscribe.settingsCta}</PrimaryAction>
+            <SecondaryAction href="/">{t.unsubscribe.backCta}</SecondaryAction>
           </>
         }
-        note="Возможно, ссылка скопирована не целиком или подписку уже удалили."
+        note={t.unsubscribe.failedNote}
       >
-        <p>
-          Отписаться по этой ссылке не получилось. Все письма можно настроить
-          в профиле — там же видно, за какими обращениями вы следите.
-        </p>
+        <p>{t.unsubscribe.failedLead}</p>
       </StateScreen>
     )
   }
 
   return (
     <StateScreen
-      title="Вы отписались"
+      title={t.unsubscribe.doneTitle}
       actions={
         <>
-          <PrimaryAction href="/profile">Настроить все письма</PrimaryAction>
-          <SecondaryAction href="/">Вернуться на портал</SecondaryAction>
+          <PrimaryAction href="/profile">{t.unsubscribe.doneCta}</PrimaryAction>
+          <SecondaryAction href="/">{t.unsubscribe.backCta}</SecondaryAction>
         </>
       }
-      note="Отписка сработала без входа — по ссылке из письма."
+      note={t.unsubscribe.doneNote}
     >
       <p>
         {postTitle
-          ? `Больше не будем писать об обновлениях обращения «${postTitle}».`
-          : 'Больше не будем писать об обновлениях этого обращения.'}{' '}
-        Остальные письма приходят как раньше.
+          ? fill(t.unsubscribe.donePost, { title: postTitle })
+          : t.unsubscribe.doneGeneric}{' '}
+        {t.unsubscribe.doneRest}
       </p>
     </StateScreen>
   )

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import type { Dictionary } from '@/core/content'
 import { feedHref, SORTS } from '@/features/feed/query-params'
 import type { FeedQuery, FeedSort } from '@/queries/types'
 
@@ -13,12 +14,22 @@ import type { FeedQuery, FeedSort } from '@/queries/types'
 export function SortTabs({
   query,
   defaultSort,
+  t,
 }: {
   query: FeedQuery
   defaultSort: FeedSort
+  t: Dictionary
 }) {
+  /* Подписи из словаря, а не из query-params: там живёт разбор адреса,
+     и тащить туда язык значит тащить словарь в разбор строки запроса. */
+  const label: Record<FeedSort, string> = {
+    trending: t.feed.sortTrending,
+    top: t.feed.sortTop,
+    new: t.feed.sortNew,
+  }
+
   return (
-    <nav aria-label="Сортировка" className="flex items-center gap-1">
+    <nav aria-label={t.common.sort} className="flex items-center gap-1">
       {SORTS.map((sort) => {
         const active = query.sort === sort.key
         return (
@@ -33,7 +44,7 @@ export function SortTabs({
                 : 'text-muted hover:bg-track hover:text-ink')
             }
           >
-            {sort.label}
+            {label[sort.key]}
           </Link>
         )
       })}

@@ -4,7 +4,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
-import { formatCount, plural } from '@/core/content'
+import {
+  fill,
+  formatCount,
+  localizedForms,
+  plural,
+  type Dictionary,
+  type Locale,
+} from '@/core/content'
 import { StatusBadge } from '@/ui/primitives/status-badge'
 import { voteAction } from '@/features/post/actions'
 import type { SimilarPostView } from '@/queries/types'
@@ -20,14 +27,18 @@ import type { SimilarPostView } from '@/queries/types'
 export function SimilarInset({
   candidates,
   searching,
+  t,
+  lang,
 }: {
   candidates: SimilarPostView[]
   searching: boolean
+  t: Dictionary
+  lang: Locale
 }) {
   if (searching && candidates.length === 0) {
     return (
       <p className="mt-2 text-small text-faint" aria-live="polite">
-        Ищем похожие…
+        {t.intake.searchingSimilar}
       </p>
     )
   }
@@ -40,17 +51,17 @@ export function SimilarInset({
       className="mt-3 rounded-card border border-line bg-track/60 p-4"
     >
       <p className="text-body font-semibold text-ink">
-        Похоже, об этом уже писали — {formatCount(candidates.length)}{' '}
-        {plural(candidates.length, ['обращение', 'обращения', 'обращений'])}
+        {fill(t.intake.similarFound, {
+          count: formatCount(candidates.length, lang),
+          label: plural(candidates.length, t.common.posts, lang),
+        })}
       </p>
-      <p className="mt-0.5 text-small text-faint">
-        голос за существующее весит больше нового
-      </p>
+      <p className="mt-0.5 text-small text-faint">{t.intake.similarHint}</p>
 
       <ul className="mt-3 space-y-2">
         {candidates.map((post) => (
           <li key={post.slug}>
-            <SimilarCard post={post} />
+            <SimilarCard post={post} t={t} lang={lang} />
           </li>
         ))}
       </ul>
@@ -58,7 +69,15 @@ export function SimilarInset({
   )
 }
 
-function SimilarCard({ post }: { post: SimilarPostView }) {
+function SimilarCard({
+  post,
+  t,
+  lang,
+}: {
+  post: SimilarPostView
+  t: Dictionary
+  lang: Locale
+}) {
   const router = useRouter()
   const [voted, setVoted] = useState(post.voted)
   const [serverCount, setServerCount] = useState<number | null>(null)
@@ -98,14 +117,19 @@ function SimilarCard({ post }: { post: SimilarPostView }) {
         </Link>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-small text-faint">
-          <StatusBadge status={post.status} size="sm" />
+          <StatusBadge status={post.status} size="sm" lang={lang} />
           <span className="tnum">
-            {formatCount(count)} {plural(count, post.type.countLabel)}
+            {formatCount(count, lang)}{' '}
+            {plural(
+              count,
+              localizedForms(post.type.countLabel, post.type.countLabelEn, lang),
+              lang,
+            )}
           </span>
           {post.commentCount > 0 && (
             <span className="tnum">
-              {formatCount(post.commentCount)}{' '}
-              {plural(post.commentCount, ['комментарий', 'комментария', 'комментариев'])}
+              {formatCount(post.commentCount, lang)}{' '}
+              {plural(post.commentCount, t.common.commentForms, lang)}
             </span>
           )}
         </div>
@@ -127,7 +151,7 @@ function SimilarCard({ post }: { post: SimilarPostView }) {
               : 'border border-line text-ink-2 hover:bg-track')
           }
         >
-          {voted ? 'Ваш голос учтён' : 'Голосовать за это'}
+          {voted ? t.intake.voteDone : t.intake.voteFor}
         </button>
       )}
     </article>

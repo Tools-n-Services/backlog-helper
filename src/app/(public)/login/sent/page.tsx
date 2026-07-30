@@ -1,12 +1,17 @@
 import type { Metadata } from 'next'
 
+import { fill } from '@/core/content'
+import { content } from '@/core/locale'
 import {
   PrimaryAction,
   SecondaryAction,
   StateScreen,
 } from '@/ui/layout/state-screen'
 
-export const metadata: Metadata = { title: 'Ссылка отправлена' }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await content()
+  return { title: t.auth.sentTitle }
+}
 
 /**
  * «Письмо отправлено» — отдельный экран, а не тост (07-ui-brief.md, раздел 3).
@@ -17,29 +22,31 @@ export const metadata: Metadata = { title: 'Ссылка отправлена' }
 export default async function LoginSentPage({
   searchParams,
 }: PageProps<'/login/sent'>) {
-  const { email } = await searchParams
+  const [{ email }, t] = await Promise.all([searchParams, content()])
   const address = (Array.isArray(email) ? email[0] : email) ?? ''
+  /* Адрес — не часть фразы, а вставка в неё: у английского порядок слов свой,
+     и склеенное «Письмо ушло на » + адрес во втором языке звучит калькой. */
+  const lead = fill(t.auth.sentLead, {
+    address: address || t.auth.sentAddressFallback,
+  })
 
   return (
     <StateScreen
       title={
         <>
-          Ссылка <span className="font-light">отправлена</span>
+          {t.auth.sentHeadingBold}{' '}
+          <span className="font-light">{t.auth.sentHeadingLight}</span>
         </>
       }
       actions={
         <>
-          <PrimaryAction href="/login">Отправить снова</PrimaryAction>
-          <SecondaryAction href="/login">Ввести другой адрес</SecondaryAction>
+          <PrimaryAction href="/login">{t.auth.sendAgain}</PrimaryAction>
+          <SecondaryAction href="/login">{t.auth.otherAddress}</SecondaryAction>
         </>
       }
-      note="Ссылка действует 15 минут. Если письма нет, проверьте папку «Спам» — иногда оно попадает туда при первом входе."
+      note={t.auth.sentNote}
     >
-      <p>
-        Письмо ушло на{' '}
-        <span className="font-semibold text-ink-2">{address || 'указанный адрес'}</span>
-        . Откройте ссылку из письма — вернётесь на страницу, с которой начали.
-      </p>
+      <p>{lead}</p>
     </StateScreen>
   )
 }

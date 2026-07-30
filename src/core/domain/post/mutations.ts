@@ -9,6 +9,7 @@
 
 import { defaultStatus } from '@config/statuses'
 import { postTypeByKey } from '@config/post-types'
+import { detectLocale } from '@/core/content'
 import { prisma } from '@/core/db'
 import { slaDueAt } from '@/core/domain/triage/sla'
 import { slugify } from '@/core/slug'
@@ -123,6 +124,7 @@ export async function addComment(input: CommentInput): Promise<{ id: string }> {
       body,
       parentId,
       internal: input.internal ?? false,
+      sourceLocale: detectLocale(body),
     },
     select: { id: true },
   })
@@ -351,6 +353,10 @@ export async function createPost(input: CreatePostInput): Promise<CreatedPost> {
       slug: await uniqueSlug(board.id, input.title),
       ref: await nextRef(),
       details: input.details.trim(),
+      /* Язык определяется при приёме, а сам перевод делает воркер (FR-181):
+         отправка обращения не должна зависеть от чужого сервиса — по той же
+         причине, по которой письма уходят отдельным проходом. */
+      sourceLocale: detectLocale(`${input.title} ${input.details}`),
       privacy: type.defaultPrivacy,
       moderation: input.moderated ? 'pending' : 'approved',
       severity,

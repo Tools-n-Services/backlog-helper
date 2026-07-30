@@ -29,11 +29,13 @@ import {
   dispatchReplies,
   portalOrigin,
 } from '@/core/domain/post/notifications'
+import { translatePending } from '@/core/domain/post/translations'
 import { processStaleNeedsInfo } from '@/core/domain/triage/needs-info'
 
 type JobName =
   | 'releases'
   | 'mail'
+  | 'translate'
   | 'needs-info'
   | 'trending'
   | 'affected'
@@ -90,6 +92,22 @@ const JOBS: Job[] = [
            они рапортуют о сотнях писем, которых никто не получал. */
         (skipped > 0 ? `, пропущено демо-адресов: ${skipped}` : '') +
         (failed > 0 ? `, не доставлено: ${failed} (повторим)` : '')
+      )
+    },
+  },
+  {
+    name: 'translate',
+    what: 'перевод обращений',
+    /* Полминуты: перевод — это то, что читатель второго языка ждёт прямо
+       сейчас, открыв ленту. Провайдер выключен — проход стоит один SELECT. */
+    everyMs: MINUTE / 2,
+    run: async () => {
+      const r = await translatePending()
+      if (r.skipped) return null
+      if (r.posts + r.comments + r.failed === 0) return null
+      return (
+        `обращений: ${r.posts}, комментариев: ${r.comments}` +
+        (r.failed > 0 ? `, не переведено: ${r.failed} (повторим)` : '')
       )
     },
   },

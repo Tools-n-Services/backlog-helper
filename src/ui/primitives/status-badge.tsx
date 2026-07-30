@@ -1,3 +1,4 @@
+import { localized, type Locale } from '@/core/content'
 import type { StatusShape } from '@config/statuses'
 import type { StatusView } from '@/queries/types'
 
@@ -68,9 +69,12 @@ function ShapeMark({ shape }: { shape: StatusShape }) {
 export function StatusBadge({
   status,
   size = 'md',
+  lang = 'ru',
 }: {
   status: StatusView
   size?: 'sm' | 'md'
+  /** Язык смотрящего: название статуса приходит из конфига обоими языками. */
+  lang?: Locale
 }) {
   return (
     <span
@@ -84,7 +88,7 @@ export function StatusBadge({
       }}
     >
       <ShapeMark shape={status.shape} />
-      {status.name}
+      {localized(status.name, status.nameEn, lang)}
     </span>
   )
 }

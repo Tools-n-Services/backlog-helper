@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
 
 import { product } from '@config/product'
+import { content } from '@/core/locale'
 import { requestMagicLink } from '@/features/session/actions'
 
-export const metadata: Metadata = { title: 'Вход' }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await content()
+  return { title: t.auth.title }
+}
 
 /**
  * Вход по ссылке из письма (FR-172).
@@ -11,20 +15,18 @@ export const metadata: Metadata = { title: 'Вход' }
  * Пароля нет намеренно: портал фидбэка — не то место, ради которого заводят
  * ещё один пароль, а забытый пароль стоит команде обращения в поддержку.
  */
-const ERRORS: Record<string, string> = {
-  'invalid-email': 'Проверьте адрес: похоже, в нём опечатка.',
-  'rate-limited':
-    'Мы уже отправили несколько ссылок на этот адрес. Проверьте почту, включая «Спам», — новую можно запросить через час.',
-}
-
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
-  const params = await searchParams
+  const [params, t] = await Promise.all([searchParams, content()])
+  const errors: Record<string, string> = {
+    'invalid-email': t.auth.errorInvalidEmail,
+    'rate-limited': t.auth.errorRateLimited,
+  }
   const first = (key: string) => {
     const value = params[key]
     return Array.isArray(value) ? value[0] : value
   }
   const error = first('error')
-  const message = error ? ERRORS[error] : null
+  const message = error ? errors[error] : null
 
   return (
     <div className="mx-auto max-w-page px-5 py-20 md:px-8 lg:px-10">
@@ -37,12 +39,10 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
         </div>
 
         <h1 className="text-h1 font-light text-ink md:text-display">
-          Вход <span className="font-extrabold">без пароля</span>
+          {t.auth.headingLight}{' '}
+          <span className="font-extrabold">{t.auth.headingBold}</span>
         </h1>
-        <p className="mt-5 text-body-l text-muted">
-          Пришлём ссылку на почту — она действует 15 минут и открывает вход
-          в один клик.
-        </p>
+        <p className="mt-5 text-body-l text-muted">{t.auth.lead}</p>
 
         {message && (
           <p
@@ -58,7 +58,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
             htmlFor="email"
             className="mb-1.5 block text-body font-semibold text-ink"
           >
-            Рабочая почта
+            {t.auth.emailLabel}
           </label>
           <input
             id="email"
@@ -69,20 +69,19 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
             /* Адрес возвращается в поле: заставлять набирать его заново
                после отказа — верный способ получить вторую опечатку. */
             defaultValue={first('email') ?? ''}
-            placeholder={`имя@${product.domain}`}
+            placeholder={`${t.auth.emailPlaceholderName}@${product.domain}`}
             className="w-full rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2 placeholder:text-faint"
           />
           <button
             type="submit"
             className="mt-4 rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
           >
-            Получить ссылку
+            {t.auth.submit}
           </button>
         </form>
 
         <p className="mt-8 border-t border-line pt-5 text-small text-faint">
-          Голосовать и комментировать можно только после входа. Читать портал —
-          без него.
+          {t.auth.note}
         </p>
       </div>
     </div>

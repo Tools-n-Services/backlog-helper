@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 
 import { attachmentRules, maxAttachmentsPerPost } from '@config/attachments'
+import { fill, localized, type Dictionary, type Locale } from '@/core/content'
 import { sizeLabel } from '@/core/format'
 import {
   ENVIRONMENT_LABELS,
@@ -24,15 +25,26 @@ export function Field({
   value,
   error,
   onChange,
+  t,
+  lang,
 }: {
   field: FormField
   value: string | string[] | boolean | undefined
   error?: string | undefined
   onChange: (value: string | string[] | boolean) => void
+  t: Dictionary
+  lang: Locale
 }) {
+  /* Подписи полей живут в схеме типа рядом с самим полем, а не в словаре:
+     форк, добавивший своё поле, добавляет и его названия — в одном месте. */
+  const label = localized(field.label, field.labelEn, lang)
+  const hint = field.hint ? localized(field.hint, field.hintEn, lang) : undefined
+  const placeholder = field.placeholder
+    ? localized(field.placeholder, field.placeholderEn, lang)
+    : undefined
   const id = `field-${field.name}`
   const labelId = `${id}-label`
-  const describedBy = [error ? `${id}-error` : null, field.hint ? `${id}-hint` : null]
+  const describedBy = [error ? `${id}-error` : null, hint ? `${id}-hint` : null]
     .filter(Boolean)
     .join(' ')
 
@@ -53,10 +65,10 @@ export function Field({
           {...(hasPersistentControl ? { htmlFor: id } : { id: labelId })}
           className="text-body font-semibold text-ink"
         >
-          {field.label}
+          {label}
           {!field.required && (
             <span className="ml-2 text-small font-normal text-faint">
-              необязательно
+              {t.intake.optional}
             </span>
           )}
         </Label>
@@ -72,7 +84,7 @@ export function Field({
           id={id}
           rows={field.name === 'steps' ? 4 : 3}
           value={typeof value === 'string' ? value : ''}
-          placeholder={field.placeholder}
+          placeholder={placeholder}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy || undefined}
           onChange={(e) => onChange(e.target.value)}
@@ -85,7 +97,7 @@ export function Field({
           id={id}
           type={field.kind === 'url' ? 'url' : 'text'}
           value={typeof value === 'string' ? value : ''}
-          placeholder={field.placeholder}
+          placeholder={placeholder}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy || undefined}
           onChange={(e) => onChange(e.target.value)}
@@ -102,10 +114,10 @@ export function Field({
           onChange={(e) => onChange(e.target.value)}
           className={control}
         >
-          <option value="">Не выбрано</option>
+          <option value="">{t.intake.notSelected}</option>
           {field.options?.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {localized(option.label, option.labelEn, lang)}
             </option>
           ))}
         </select>
@@ -120,7 +132,7 @@ export function Field({
             onChange={(e) => onChange(e.target.checked)}
             className="size-4 accent-[var(--color-ink)]"
           />
-          <span className="text-body text-ink-2">{field.placeholder ?? field.label}</span>
+          <span className="text-body text-ink-2">{placeholder ?? label}</span>
         </label>
       )}
 
@@ -130,18 +142,19 @@ export function Field({
           labelId={labelId}
           value={typeof value === 'string' ? value : ''}
           onChange={onChange}
+          t={t}
         />
       )}
 
       {field.kind === 'attachments' && (
         /* Список загруженного держит сам компонент: в значении формы живут
            только идентификаторы, а имена и размеры нужны лишь ему. */
-        <AttachmentsField id={id} onChange={onChange} />
+        <AttachmentsField id={id} onChange={onChange} t={t} lang={lang} />
       )}
 
-      {field.hint && (
+      {hint && (
         <p id={`${id}-hint`} className="mt-1.5 text-small text-faint">
-          {field.hint}
+          {hint}
         </p>
       )}
 
@@ -167,11 +180,13 @@ function EnvironmentField({
   labelId,
   value,
   onChange,
+  t,
 }: {
   id: string
   labelId: string
   value: string
   onChange: (value: string) => void
+  t: Dictionary
 }) {
   const [open, setOpen] = useState(false)
   const lines = value.split('\n').filter(Boolean)
@@ -188,18 +203,16 @@ function EnvironmentField({
         <span className="min-w-0 truncate text-body text-ink-2">
           {lines.length > 0
             ? lines.map((l) => l.split(': ')[1]).join(' · ')
-            : 'Данные не собрались — заполните вручную'}
+            : t.intake.envEmpty}
         </span>
         <span className="shrink-0 text-small text-faint">
-          {open ? 'свернуть' : 'проверить'}
+          {open ? t.intake.envCollapse : t.intake.envCheck}
         </span>
       </button>
 
       {open && (
         <div id={`${id}-panel`} className="border-t border-line p-3.5">
-          <p className="mb-2 text-small text-faint">
-            Это всё, что мы отправим вместе с обращением. Поправьте, если ошиблись.
-          </p>
+          <p className="mb-2 text-small text-faint">{t.intake.envNote}</p>
           <textarea
             id={id}
             rows={Object.keys(ENVIRONMENT_LABELS).length}
@@ -233,9 +246,13 @@ interface Uploaded {
 function AttachmentsField({
   id,
   onChange,
+  t,
+  lang,
 }: {
   id: string
   onChange: (value: string[]) => void
+  t: Dictionary
+  lang: Locale
 }) {
   const [files, setFiles] = useState<Uploaded[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -285,13 +302,15 @@ function AttachmentsField({
         className={full ? 'text-body text-faint' : 'cursor-pointer text-body text-muted'}
       >
         {pending ? (
-          'Загружаем…'
+          t.intake.uploading
         ) : full ? (
-          `Больше ${maxAttachmentsPerPost} файлов к одному обращению не прикладываем`
+          fill(t.intake.filesFull, { count: maxAttachmentsPerPost })
         ) : (
           <>
-            Перетащите скриншот, видео или лог — или{' '}
-            <span className="font-semibold text-ink underline">выберите файл</span>
+            {t.intake.dropHint}{' '}
+            <span className="font-semibold text-ink underline">
+              {t.intake.chooseFile}
+            </span>
           </>
         )}
       </label>
@@ -321,7 +340,7 @@ function AttachmentsField({
                 onClick={() => discard(file.id)}
                 className="ml-auto shrink-0 rounded-field px-2 text-muted hover:bg-track hover:text-ink"
               >
-                Убрать
+                {t.intake.remove}
               </button>
             </li>
           ))}
@@ -333,10 +352,16 @@ function AttachmentsField({
       <p className="mt-1.5 text-small text-faint">
         {/* Пределы — из конфига: подпись, разошедшаяся с проверкой на сервере,
             обещает то, что будет отвергнуто. */}
-        {attachmentRules
-          .map((rule) => `${rule.name} до ${sizeLabel(rule.maxBytes)}`)
-          .join(' · ')}
-        . Видны только команде.
+        {fill(t.intake.filesNote, {
+          limits: attachmentRules
+            .map((rule) =>
+              fill(t.intake.ruleLimit, {
+                name: localized(rule.name, rule.nameEn, lang),
+                size: sizeLabel(rule.maxBytes),
+              }),
+            )
+            .join(' · '),
+        })}
       </p>
     </div>
   )

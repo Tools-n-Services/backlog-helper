@@ -42,10 +42,17 @@ export const locales: { key: Locale; name: string }[] = [
  */
 export type PluralForms = [string, string, string]
 
-export type Dictionary = Omit<typeof ru, 'common'> & {
-  common: Omit<(typeof ru)['common'], 'posts' | 'commentForms'> & {
+export type Dictionary = Omit<typeof ru, 'common' | 'post' | 'profile'> & {
+  common: Omit<(typeof ru)['common'], 'posts' | 'commentForms' | 'voteForms'> & {
     posts: PluralForms
     commentForms: PluralForms
+    voteForms: PluralForms
+  }
+  post: Omit<(typeof ru)['post'], 'helpfulForms'> & {
+    helpfulForms: PluralForms
+  }
+  profile: Omit<(typeof ru)['profile'], 'inProgressForms'> & {
+    inProgressForms: PluralForms
   }
 }
 
@@ -74,6 +81,57 @@ export function preferredLocale(acceptLanguage: string): Locale {
   return isLocale(product.locale) ? product.locale : 'ru'
 }
 
+/**
+ * Язык, на котором написан текст (FR-181).
+ *
+ * Считаем буквы: кириллических больше латинских — русский, иначе английский.
+ * Для пары «русский / английский» этого достаточно, и в отличие от библиотек
+ * определения языка эта функция не ошибается на коротком тексте вроде
+ * «не грузится» — а короткого текста в багрепортах большинство.
+ *
+ * null — букв нет вовсе: «404», «???». Переводить там нечего, и обращение
+ * не должно занимать очередь и деньги.
+ */
+export function detectLocale(text: string): Locale | null {
+  let cyrillic = 0
+  let latin = 0
+  for (const char of text) {
+    if (/[а-яё]/i.test(char)) cyrillic++
+    else if (/[a-z]/i.test(char)) latin++
+  }
+  if (cyrillic === 0 && latin === 0) return null
+  return cyrillic > latin ? 'ru' : 'en'
+}
+
+/**
+ * Перевод для смотрящего — или ничего.
+ *
+ * Ничего в трёх случаях: текст уже на языке читателя, перевода ещё нет
+ * (воркер не дошёл), язык оригинала неизвестен. Во всех трёх показывается
+ * оригинал — молча, без пометок: «перевод недоступен» на русском тексте
+ * для русского читателя выглядит поломкой, а не заботой.
+ */
+export function pickTranslation<T extends { locale: string }>(
+  translations: T[],
+  lang: Locale,
+  sourceLocale: string | null,
+): T | null {
+  if (!sourceLocale || sourceLocale === lang) return null
+  return translations.find((entry) => entry.locale === lang) ?? null
+}
+
+/**
+ * Язык оригинала для подписи «Переведено с русского».
+ *
+ * В базе это обычная строка: там может оказаться язык импорта или язык,
+ * который портал больше не поддерживает. Подпись при этом обязана остаться
+ * осмысленной, поэтому неизвестное сводится к языку продукта.
+ */
+export function sourceLanguage(sourceLocale: string | null): Locale {
+  if (isLocale(sourceLocale)) return sourceLocale
+  return isLocale(product.locale) ? product.locale : 'ru'
+}
+
 /** Словарь конкретного языка — для писем и фоновых проходов, где запроса нет. */
 export function dictionaryFor(value: Locale): Dictionary {
   return dictionaries[value]
@@ -96,6 +154,28 @@ export function plural(n: number, forms: PluralForms, lang: Locale = 'ru'): stri
   if (tens > 1 && tens < 5) return forms[1]
   if (tens === 1) return forms[0]
   return forms[2]
+}
+
+/**
+ * Подстановка в строку словаря: «и ещё {count}» → «и ещё 12».
+ *
+ * Порядок слов в языках разный: «и ещё 12» против «12 more». Склейка в коде
+ * («и ещё » + n) фиксирует русский порядок и во втором языке даёт кальку,
+ * поэтому целая фраза с местом для числа лежит в словаре.
+ */
+export function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
+    key in values ? String(values[key]) : whole,
+  )
+}
+
+/** Формы счётного слова на языке смотрящего: «голос» / «vote». */
+export function localizedForms(
+  forms: PluralForms,
+  english: PluralForms | undefined,
+  lang: Locale,
+): PluralForms {
+  return lang === 'en' && english ? english : forms
 }
 
 /** Разряды: 14375 → «14 375» или «14,375». */

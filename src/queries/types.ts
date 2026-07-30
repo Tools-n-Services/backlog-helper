@@ -31,8 +31,11 @@ export interface PostTypeView {
   nameEn?: string
   allowsVotes: boolean
   voteLabel: string
+  voteLabelEn?: string
   /** Формы слова для счётчика: голоса у идей, затронутые у багов. */
   countLabel: [string, string, string]
+  /** Английские формы (FR-181). Пусто — показываем основные. */
+  countLabelEn?: [string, string, string]
 }
 
 export interface BoardView {
@@ -50,12 +53,34 @@ export interface BoardView {
 }
 
 /** Карточка обращения в ленте (FR-118). */
+/**
+ * Перевод текста на другой язык (FR-181).
+ *
+ * Отдаётся рядом с оригиналом, а не вместо него: пометка «переведено» без
+ * возможности посмотреть исходный текст — это не перевод, а замена. Автор
+ * писал конкретные слова, и читатель имеет право их увидеть.
+ *
+ * Тело абзацами — как и оригинал: в карточке ленты абзац один (выжимка),
+ * на странице обращения их столько же, сколько в исходном тексте,
+ * у комментария — один, целиком.
+ */
+export interface TranslationView {
+  locale: string
+  /** У комментария заголовка нет. */
+  title: string | null
+  body: string[]
+}
+
 export interface PostCardView {
   id: string
   slug: string
   boardSlug: string
   title: string
   excerpt: string
+  /** Язык оригинала; null — не определяли (FR-181). */
+  sourceLocale: string | null
+  /** Готовые переводы. Пусто — перевода ещё нет или он не нужен. */
+  translations: TranslationView[]
   type: PostTypeView
   status: StatusView
   categoryName: string | null
@@ -88,6 +113,8 @@ export type FeedSort = 'trending' | 'top' | 'new'
 export interface FacetView {
   key: string
   name: string
+  /** Название на английском (FR-181): статусы и типы приходят из конфига. */
+  nameEn?: string
   count: number
   /** Для иерархических категорий: ключ родителя. */
   parentKey?: string
@@ -143,6 +170,9 @@ export interface CommentView {
   /** Команда прибивает свой ответ наверх треда (FR-138). */
   pinned: boolean
   replies: CommentView[]
+  /** Язык оригинала и готовые переводы (FR-181). */
+  sourceLocale: string | null
+  translations: TranslationView[]
 }
 
 /** Запись истории статусов (FR-140). */
@@ -251,9 +281,12 @@ export interface RoadmapCardView {
   boardName: string
   title: string
   typeName: string
+  /** Название типа и формы счётного слова по-английски (FR-181). */
+  typeNameEn?: string
   categoryName: string | null
   count: number
   countLabel: [string, string, string]
+  countLabelEn?: [string, string, string]
   /** Ожидаемый срок, если команда его назвала: «II квартал», «релиз 2.31». */
   eta: string | null
 }
@@ -269,7 +302,7 @@ export interface RoadmapColumnView {
 
 export interface RoadmapView {
   columns: RoadmapColumnView[]
-  boards: { slug: string; name: string }[]
+  boards: { slug: string; name: string; nameEn?: string }[]
 }
 
 /* ────────────────────────── Changelog ────────────────────────── */
@@ -296,6 +329,8 @@ export interface ChangelogPostLink {
   status: StatusView
   count: number
   countLabel: [string, string, string]
+  /** Английские формы счётного слова (FR-181). */
+  countLabelEn?: [string, string, string]
 }
 
 export interface ChangelogEntryView {

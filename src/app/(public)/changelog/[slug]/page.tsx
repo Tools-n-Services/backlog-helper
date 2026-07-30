@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { product } from '@config/product'
-import { formatCount, plural } from '@/core/content'
+import { fill, formatCount, localizedForms, plural } from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { queries } from '@/queries'
 import { KindBadge } from '@/ui/changelog/kind-badge'
 import { StatusBadge } from '@/ui/primitives/status-badge'
@@ -33,7 +34,7 @@ export default async function ChangelogEntryPage({
 }: PageProps<'/changelog/[slug]'>) {
   if (!product.features.changelog) notFound()
 
-  const { slug } = await params
+  const [{ slug }, t, lang] = await Promise.all([params, content(), locale()])
   const entry = await queries.getChangelogEntry(slug)
   if (!entry) notFound()
 
@@ -41,15 +42,17 @@ export default async function ChangelogEntryPage({
     <div className="mx-auto max-w-page px-5 pb-16 pt-10 md:px-8 lg:px-10">
       <article className="mx-auto max-w-[46rem]">
         <nav
-          aria-label="Хлебные крошки"
+          aria-label={t.common.breadcrumbs}
           className="mb-6 flex items-center gap-2 text-small text-faint"
         >
           <Link href="/changelog" className="hover:text-ink">
-            Что нового
+            {t.changelog.title}
           </Link>
           <span aria-hidden>/</span>
           <span className="text-ink-2">
-            {entry.version ? `Релиз ${entry.version}` : entry.title}
+            {entry.version
+              ? fill(t.changelog.release, { version: entry.version })
+              : entry.title}
           </span>
         </nav>
 
@@ -78,7 +81,7 @@ export default async function ChangelogEntryPage({
         <div className="mt-10 space-y-9">
           {entry.changes.map((change, i) => (
             <section key={i}>
-              <KindBadge kind={change.kind} />
+              <KindBadge kind={change.kind} t={t} />
               <h2 className="mt-3 text-h3 font-bold text-ink">{change.title}</h2>
               <p className="mt-2 text-body-l leading-relaxed text-ink-2">
                 {change.body}
@@ -90,7 +93,7 @@ export default async function ChangelogEntryPage({
         {entry.closedPosts.length > 0 && (
           <section className="mt-12 border-t border-line pt-6">
             <h2 className="mb-4 font-mono text-label uppercase text-faint">
-              Закрытые обращения
+              {t.changelog.closedPostsTitle}
             </h2>
             <ul className="space-y-3">
               {entry.closedPosts.map((post) => (
@@ -105,17 +108,20 @@ export default async function ChangelogEntryPage({
                     {post.title}
                   </Link>
                   <span className="flex shrink-0 items-center gap-3">
-                    <StatusBadge status={post.status} size="sm" />
+                    <StatusBadge status={post.status} size="sm" lang={lang} />
                     <span className="tnum text-small text-faint">
-                      {formatCount(post.count)} {plural(post.count, post.countLabel)}
+                      {formatCount(post.count, lang)}{' '}
+                      {plural(
+                        post.count,
+                        localizedForms(post.countLabel, post.countLabelEn, lang),
+                        lang,
+                      )}
                     </span>
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-small text-faint">
-              Все, кто голосовал за эти обращения, получили письмо о выходе.
-            </p>
+            <p className="mt-3 text-small text-faint">{t.changelog.mailNote}</p>
           </section>
         )}
       </article>

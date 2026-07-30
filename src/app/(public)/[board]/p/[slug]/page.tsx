@@ -3,11 +3,24 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { formatCount, plural } from '@/core/content'
+import {
+  formatCount,
+  localized,
+  pickTranslation,
+  plural,
+  sourceLanguage,
+} from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { can, isStaff } from '@/core/permissions'
 import { canContribute, getViewer } from '@/core/session'
 import { submitCommentForm } from '@/features/post/actions'
 import { PostActions } from '@/features/post/post-actions'
+import {
+  TranslatedLine,
+  TranslatedParagraphs,
+  TranslationNotice,
+  TranslationScope,
+} from '@/features/post/translation'
 import { VoteControl } from '@/features/post/vote-control'
 import { queries } from '@/queries'
 import { CommentThread } from '@/ui/post/comment-thread'
@@ -15,6 +28,7 @@ import { MergedPosts, StatusHistory, Voters } from '@/ui/post/post-aside'
 import { Avatar } from '@/ui/primitives/avatar'
 import { Chip } from '@/ui/primitives/chip'
 import { StatusBadge } from '@/ui/primitives/status-badge'
+import type { Dictionary } from '@/core/content'
 import type { AttachmentView, BacklogLinkView, PostMergedView } from '@/queries/types'
 
 export async function generateMetadata({
@@ -48,15 +62,20 @@ export async function generateMetadata({
 export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'>) {
   const { board: boardSlug, slug } = await params
   const viewer = await getViewer()
-  const [board, result] = await Promise.all([
+  const [board, result, t, lang] = await Promise.all([
     queries.getBoard(boardSlug),
     queries.getPost(boardSlug, slug, viewer.signedIn ? viewer.id : undefined),
+    content(),
+    locale(),
   ])
   if (!board || !result) notFound()
 
-  if (result.kind === 'merged') return <MergedNotice result={result} />
+  if (result.kind === 'merged') return <MergedNotice result={result} t={t} />
 
   const post = result
+
+  /* Перевод обращения на язык смотрящего — если он есть и нужен (FR-181). */
+  const translation = pickTranslation(post.translations, lang, post.sourceLocale)
 
   /* Внутренняя часть — только команде: формулировки в бэклоге свои,
      и показывать их автору обращения незачем и вредно. */
@@ -74,24 +93,26 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-8 md:px-8 lg:px-10">
       <nav
-        aria-label="Хлебные крошки"
+        aria-label={t.common.breadcrumbs}
         className="mb-6 flex flex-wrap items-center gap-2 text-small text-faint"
       >
         <Link href="/" className="hover:text-ink">
-          Все доски
+          {t.nav.boards}
         </Link>
         <span aria-hidden>/</span>
         <Link href={`/${board.slug}`} className="hover:text-ink">
-          {board.name}
+          {localized(board.name, board.nameEn, lang)}
         </Link>
         <span aria-hidden>/</span>
         <span className="font-mono text-ink-2">{post.ref}</span>
       </nav>
 
-      <BacklogStrip links={backlogLinks} />
+      <BacklogStrip links={backlogLinks} label={t.post.inBacklog} />
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
+          {/* Заголовок и текст переключаются вместе: это одно сообщение. */}
+          <TranslationScope available={translation !== null}>
           <div className="flex gap-5">
             <VoteControl
               postId={post.id}
@@ -100,12 +121,19 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
               voted={post.voted}
               signedIn={canContribute(viewer)}
               variant="page"
+              lang={lang}
+              labels={{
+                noVotes: t.feed.noVotes,
+                youVoted: t.feed.youVoted,
+                aria: t.feed.voteAria,
+                ariaSignIn: t.feed.voteAriaSignIn,
+              }}
             />
 
             <div className="min-w-0 flex-1">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Chip>{post.type.name}</Chip>
-                <StatusBadge status={post.status} />
+                <Chip>{localized(post.type.name, post.type.nameEn, lang)}</Chip>
+                <StatusBadge status={post.status} lang={lang} />
                 {post.categoryName && (
                   <Chip
                     href={`/${post.boardSlug}?category=${post.categorySlug}`}
@@ -115,31 +143,42 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                   </Chip>
                 )}
                 <span className="text-small text-faint">
-                  создано <time dateTime={post.createdAt}>{post.createdLabel}</time>
+                  {t.post.created}{' '}
+                  <time dateTime={post.createdAt}>{post.createdLabel}</time>
                 </span>
               </div>
 
-              <h1 className="text-h2 font-extrabold tracking-tight text-ink">
-                {post.title}
-              </h1>
+              <TranslatedLine
+                as="h1"
+                className="text-h2 font-extrabold tracking-tight text-ink"
+                original={post.title}
+                translation={translation?.title ?? null}
+              />
+
+              <TranslationNotice
+                className="mt-2"
+                from={t.post.translatedFrom[sourceLanguage(post.sourceLocale)]}
+                showOriginal={t.post.showOriginal}
+                showTranslation={t.post.showTranslation}
+              />
 
               {post.eta && (
                 <p className="mt-2 text-small text-muted">
-                  Ожидаем выпустить: <span className="text-ink-2">{post.eta}</span>
+                  {t.post.eta}: <span className="text-ink-2">{post.eta}</span>
                 </p>
               )}
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
-            {post.details.map((paragraph, i) => (
-              <p key={i} className="text-body-l leading-relaxed text-ink-2">
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          <TranslatedParagraphs
+            className="mt-6 space-y-4"
+            itemClassName="text-body-l leading-relaxed text-ink-2"
+            original={post.details}
+            translation={translation?.body ?? null}
+          />
+          </TranslationScope>
 
-          {attachments.length > 0 && <Attachments items={attachments} />}
+          {attachments.length > 0 && <Attachments items={attachments} t={t} />}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
             <div className="flex items-center gap-3">
@@ -158,9 +197,9 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
 
           <section className="mt-10">
             <h2 className="mb-5 flex items-baseline gap-2.5 text-h3 font-bold text-ink">
-              Обсуждение
+              {t.post.discussion}
               <span className="tnum text-body font-normal text-faint">
-                {formatCount(post.commentCount)}
+                {formatCount(post.commentCount, lang)}
               </span>
             </h2>
 
@@ -175,7 +214,7 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                 <Avatar initials={viewer.initials} />
                 <div className="min-w-0 flex-1">
                   <label htmlFor="comment" className="sr-only">
-                    Комментарий
+                    {t.post.commentLabel}
                   </label>
                   <textarea
                     id="comment"
@@ -183,39 +222,43 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
                     rows={3}
                     required
                     minLength={2}
-                    placeholder="Добавьте детали, которые помогут разобраться"
+                    placeholder={t.post.commentPlaceholder}
                     className="w-full resize-y rounded-field border border-line bg-surface px-3.5 py-2.5 text-body text-ink-2 placeholder:text-faint"
                   />
                   <button
                     type="submit"
                     className="mt-2 rounded-pill bg-ink px-5 py-2 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
                   >
-                    Отправить
+                    {t.post.send}
                   </button>
                 </div>
               </form>
             ) : (
               <p className="mb-8 rounded-card border border-line bg-surface px-4 py-3 text-body text-muted">
+                {t.post.signInToComment}{' '}
                 <Link href="/login" className="font-semibold text-ink underline">
-                  Войдите
+                  {t.post.signInAction}
                 </Link>
-                , чтобы участвовать в обсуждении.
+                .
               </p>
             )}
 
-            <CommentThread comments={post.comments} />
+            <CommentThread comments={post.comments} t={t} lang={lang} />
           </section>
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <StatusHistory history={post.statusHistory} />
+          <StatusHistory history={post.statusHistory} t={t} lang={lang} />
           <Voters
             voters={post.voters}
             total={post.votersTotal}
             hidden={post.votersHidden}
             countLabel={post.type.countLabel}
+            countLabelEn={post.type.countLabelEn}
+            t={t}
+            lang={lang}
           />
-          <MergedPosts merged={post.merged} boardSlug={post.boardSlug} />
+          <MergedPosts merged={post.merged} boardSlug={post.boardSlug} t={t} lang={lang} />
         </aside>
       </div>
     </div>
@@ -229,12 +272,12 @@ export default async function PostPage({ params }: PageProps<'/[board]/p/[slug]'
  * требует открыть бэклог и поискать: этим уже кто-то занимается или нет.
  * Работ может быть несколько — «выгрузка в Excel» это и экспорт, и права.
  */
-function BacklogStrip({ links }: { links: BacklogLinkView[] }) {
+function BacklogStrip({ links, label }: { links: BacklogLinkView[]; label: string }) {
   if (links.length === 0) return null
 
   return (
     <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-card border border-dashed border-line px-3.5 py-2">
-      <span className="font-mono text-label uppercase text-faint">В работе</span>
+      <span className="font-mono text-label uppercase text-faint">{label}</span>
       {links.map((link) => (
         <Link
           key={link.id}
@@ -259,25 +302,22 @@ function BacklogStrip({ links }: { links: BacklogLinkView[] }) {
  * Отдельный вопрос — 301 для поисковиков и старых писем (FR-212): он появится
  * настоящим редиректом, а здесь важен именно видимый экран с объяснением.
  */
-function MergedNotice({ result }: { result: PostMergedView }) {
+function MergedNotice({ result, t }: { result: PostMergedView; t: Dictionary }) {
   return (
     <div className="mx-auto max-w-page px-5 py-20 md:px-8 lg:px-10">
       <div className="mx-auto max-w-[56ch] text-center">
         <p className="font-mono text-label uppercase text-faint">
-          Обращение объединено
+          {t.post.mergedEyebrow}
         </p>
         <h1 className="mt-4 text-h2 font-extrabold tracking-tight text-ink">
           {result.title}
         </h1>
-        <p className="mt-4 text-body-l text-muted">
-          Мы объединили это обращение с другим — о том же самом писали несколько
-          человек. Голоса и комментарии перенесены, следить за работой нужно там.
-        </p>
+        <p className="mt-4 text-body-l text-muted">{t.post.mergedLead}</p>
         <Link
           href={`/${result.target.boardSlug}/p/${result.target.slug}`}
           className="mt-7 inline-block rounded-pill bg-ink px-5 py-2.5 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
         >
-          Перейти к обращению
+          {t.post.mergedCta}
         </Link>
         <p className="mt-3 text-small text-faint">{result.target.title}</p>
       </div>
@@ -295,10 +335,10 @@ function MergedNotice({ result }: { result: PostMergedView }) {
  * Пометка «только команде» стоит рядом с файлом не для красоты: репортер
  * должен видеть, что его скриншот с чужими фамилиями не попал в ленту.
  */
-function Attachments({ items }: { items: AttachmentView[] }) {
+function Attachments({ items, t }: { items: AttachmentView[]; t: Dictionary }) {
   return (
     <section className="mt-6">
-      <h2 className="mb-2 text-body font-semibold text-ink">Вложения</h2>
+      <h2 className="mb-2 text-body font-semibold text-ink">{t.post.attachments}</h2>
       <ul className="space-y-2">
         {items.map((file) => (
           <li key={file.id}>
@@ -313,7 +353,7 @@ function Attachments({ items }: { items: AttachmentView[] }) {
               <span className="tnum shrink-0 text-faint">{file.sizeLabel}</span>
               {file.teamOnly && (
                 <span className="shrink-0 rounded-field bg-track px-1.5 text-faint">
-                  только команде
+                  {t.post.teamOnly}
                 </span>
               )}
             </a>

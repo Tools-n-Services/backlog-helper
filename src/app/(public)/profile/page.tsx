@@ -2,7 +2,15 @@ import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
 
-import { formatCount, plural } from '@/core/content'
+import {
+  formatCount,
+  localized,
+  plural,
+  type Dictionary,
+  type Locale,
+  type PluralForms,
+} from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { getViewer } from '@/core/session'
 import { NOTIFICATION_KINDS } from '@/core/domain/post/notification-prefs'
 import { signOutAction } from '@/features/session/actions'
@@ -19,33 +27,31 @@ export const metadata: Metadata = { title: 'Профиль', robots: { index: fa
 
 type Tab = 'posts' | 'votes' | 'notifications'
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'posts', label: 'Мои обращения' },
-  { key: 'votes', label: 'За что голосовал' },
-  { key: 'notifications', label: 'Уведомления' },
-]
+const TABS: Tab[] = ['posts', 'votes', 'notifications']
 
 /** Профиль (FR-174): мои обращения, голоса, настройки писем. */
 export default async function ProfilePage({ searchParams }: PageProps<'/profile'>) {
-  const viewer = await getViewer()
+  const [viewer, t, lang] = await Promise.all([getViewer(), content(), locale()])
 
   if (!viewer.signedIn) {
     return (
       <StateScreen
-        title="Профиль открывается после входа"
-        actions={<PrimaryAction href="/login">Войти</PrimaryAction>}
+        title={t.profile.signedOutTitle}
+        actions={<PrimaryAction href="/login">{t.nav.signIn}</PrimaryAction>}
       >
-        <p>
-          Здесь будут ваши обращения, голоса и настройки писем. Читать портал
-          можно и без входа.
-        </p>
+        <p>{t.profile.signedOutLead}</p>
       </StateScreen>
     )
   }
 
   const { tab } = await searchParams
   const raw = Array.isArray(tab) ? tab[0] : tab
-  const active: Tab = TABS.some((t) => t.key === raw) ? (raw as Tab) : 'posts'
+  const active: Tab = TABS.includes(raw as Tab) ? (raw as Tab) : 'posts'
+  const tabLabel: Record<Tab, string> = {
+    posts: t.profile.tabPosts,
+    votes: t.profile.tabVotes,
+    notifications: t.profile.tabNotifications,
+  }
 
   const profile = await queries.getProfile(viewer.id)
   const list = active === 'votes' ? profile.voted : profile.authored
@@ -70,49 +76,51 @@ export default async function ProfilePage({ searchParams }: PageProps<'/profile'
             type="submit"
             className="rounded-pill border border-line px-4 py-2 text-small font-semibold text-ink-2 transition-colors hover:bg-surface-2"
           >
-            Выйти
+            {t.profile.signOut}
           </button>
         </form>
       </header>
 
       <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4 border-y border-line py-5">
-        <Stat value={profile.stats.authored} label={['обращение', 'обращения', 'обращений']} />
-        <Stat value={profile.stats.voted} label={['голос', 'голоса', 'голосов']} />
-        <Stat value={profile.stats.inProgress} label={['в работе', 'в работе', 'в работе']} />
+        <Stat value={profile.stats.authored} label={t.common.posts} lang={lang} />
+        <Stat value={profile.stats.voted} label={t.common.voteForms} lang={lang} />
+        <Stat
+          value={profile.stats.inProgress}
+          label={t.profile.inProgressForms}
+          lang={lang}
+        />
       </dl>
 
-      <nav aria-label="Разделы профиля" className="mt-8 flex flex-wrap gap-2">
-        {TABS.map((t) => (
+      <nav aria-label={t.profile.sections} className="mt-8 flex flex-wrap gap-2">
+        {TABS.map((key) => (
           <Link
-            key={t.key}
-            href={`/profile?tab=${t.key}` as Route}
-            aria-current={active === t.key ? 'true' : undefined}
+            key={key}
+            href={`/profile?tab=${key}` as Route}
+            aria-current={active === key ? 'true' : undefined}
             className={
               'rounded-pill px-3.5 py-1.5 text-body font-semibold transition-colors ' +
-              (active === t.key
+              (active === key
                 ? 'bg-ink text-surface'
                 : 'text-muted hover:bg-track hover:text-ink')
             }
           >
-            {t.label}
+            {tabLabel[key]}
           </Link>
         ))}
       </nav>
 
       <div className="mt-6">
         {active === 'notifications' ? (
-          <NotificationSettings />
+          <NotificationSettings t={t} lang={lang} />
         ) : list.length === 0 ? (
           <p className="rounded-card border border-dashed border-line px-6 py-12 text-center text-body text-muted">
-            {active === 'votes'
-              ? 'Вы ещё ни за что не голосовали. Голос — самый быстрый способ повлиять на очередь.'
-              : 'Вы ещё не создавали обращений.'}
+            {active === 'votes' ? t.profile.emptyVotes : t.profile.emptyPosts}
           </p>
         ) : (
           <ul className="space-y-2.5">
             {list.map((post) => (
               <li key={post.id}>
-                <PostCard post={post} signedIn={viewer.signedIn} />
+                <PostCard post={post} signedIn={viewer.signedIn} t={t} lang={lang} />
               </li>
             ))}
           </ul>
@@ -125,16 +133,20 @@ export default async function ProfilePage({ searchParams }: PageProps<'/profile'
 function Stat({
   value,
   label,
+  lang,
 }: {
   value: number
-  label: [string, string, string]
+  label: PluralForms
+  lang: Locale
 }) {
   return (
     <div>
       <dt className="sr-only">{label[2]}</dt>
       <dd>
-        <span className="tnum text-h2 font-bold text-ink">{formatCount(value)}</span>{' '}
-        <span className="text-small text-faint">{plural(value, label)}</span>
+        <span className="tnum text-h2 font-bold text-ink">
+          {formatCount(value, lang)}
+        </span>{' '}
+        <span className="text-small text-faint">{plural(value, label, lang)}</span>
       </dd>
     </div>
   )
@@ -149,7 +161,7 @@ function Stat({
  * без рассылки за ним человек считает настройкой, а почта идёт как раньше —
  * и следующим он нажимает «спам».
  */
-async function NotificationSettings() {
+async function NotificationSettings({ t, lang }: { t: Dictionary; lang: Locale }) {
   const prefs = await currentNotificationPrefs()
 
   return (
@@ -166,9 +178,11 @@ async function NotificationSettings() {
               />
               <span className="min-w-0">
                 <span className="block text-body font-semibold text-ink">
-                  {kind.title}
+                  {localized(kind.title, kind.titleEn, lang)}
                 </span>
-                <span className="mt-0.5 block text-small text-muted">{kind.hint}</span>
+                <span className="mt-0.5 block text-small text-muted">
+                  {localized(kind.hint, kind.hintEn, lang)}
+                </span>
               </span>
             </label>
           </li>
@@ -179,13 +193,10 @@ async function NotificationSettings() {
         type="submit"
         className="mt-4 rounded-pill bg-ink px-5 py-2 text-small font-semibold text-surface transition-colors hover:bg-ink-hover"
       >
-        Сохранить
+        {t.profile.save}
       </button>
 
-      <p className="mt-4 text-small text-faint">
-        Письма приходят только по обращениям, за которыми вы следите. Отписаться
-        от одного обращения можно ссылкой в самом письме — без входа.
-      </p>
+      <p className="mt-4 text-small text-faint">{t.profile.lettersNote}</p>
     </form>
   )
 }

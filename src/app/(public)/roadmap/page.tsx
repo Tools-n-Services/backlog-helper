@@ -4,14 +4,23 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { product } from '@config/product'
-import { formatCount, plural } from '@/core/content'
+import {
+  fill,
+  formatCount,
+  localized,
+  localizedForms,
+  plural,
+  type Dictionary,
+  type Locale,
+} from '@/core/content'
+import { content, locale } from '@/core/locale'
 import { queries } from '@/queries'
 import { StatusBadge } from '@/ui/primitives/status-badge'
 import type { RoadmapCardView, RoadmapColumnView } from '@/queries/types'
 
-export const metadata: Metadata = {
-  title: 'Что делаем',
-  description: 'Что запланировано, что в работе и что уже вышло.',
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await content()
+  return { title: t.roadmap.title, description: t.roadmap.description }
 }
 
 /**
@@ -23,7 +32,11 @@ export const metadata: Metadata = {
 export default async function RoadmapPage({ searchParams }: PageProps<'/roadmap'>) {
   if (!product.features.roadmap) notFound()
 
-  const { board, expand } = await searchParams
+  const [{ board, expand }, t, lang] = await Promise.all([
+    searchParams,
+    content(),
+    locale(),
+  ])
   const boardSlug = Array.isArray(board) ? board[0] : board
   const expandKey = Array.isArray(expand) ? expand[0] : expand
   const roadmap = await queries.getRoadmap(boardSlug, expandKey)
@@ -31,15 +44,14 @@ export default async function RoadmapPage({ searchParams }: PageProps<'/roadmap'
   return (
     <div className="mx-auto max-w-page px-5 pb-16 pt-12 md:px-8 lg:px-10">
       <h1 className="max-w-[16ch] text-h1 font-light text-ink md:text-display">
-        Что мы делаем <span className="font-extrabold">сейчас и дальше</span>
+        {t.roadmap.headingLight}{' '}
+        <span className="font-extrabold">{t.roadmap.headingBold}</span>
       </h1>
-      <p className="mt-5 max-w-[52ch] text-body-l text-muted">
-        Планы могут меняться. Дата появляется, когда работа началась.
-      </p>
+      <p className="mt-5 max-w-[52ch] text-body-l text-muted">{t.roadmap.lead}</p>
 
-      <nav aria-label="Фильтр по доске" className="mt-8 flex flex-wrap gap-2">
+      <nav aria-label={t.roadmap.boardFilter} className="mt-8 flex flex-wrap gap-2">
         <BoardTab href="/roadmap" active={!boardSlug}>
-          Все доски
+          {t.nav.boards}
         </BoardTab>
         {roadmap.boards.map((b) => (
           <BoardTab
@@ -47,14 +59,20 @@ export default async function RoadmapPage({ searchParams }: PageProps<'/roadmap'
             href={`/roadmap?board=${b.slug}` as Route}
             active={boardSlug === b.slug}
           >
-            {b.name}
+            {localized(b.name, b.nameEn, lang)}
           </BoardTab>
         ))}
       </nav>
 
       <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {roadmap.columns.map((column) => (
-          <Column key={column.status.key} column={column} boardSlug={boardSlug} />
+          <Column
+            key={column.status.key}
+            column={column}
+            boardSlug={boardSlug}
+            t={t}
+            lang={lang}
+          />
         ))}
       </div>
     </div>
@@ -87,9 +105,13 @@ function BoardTab({
 function Column({
   column,
   boardSlug,
+  t,
+  lang,
 }: {
   column: RoadmapColumnView
   boardSlug: string | undefined
+  t: Dictionary
+  lang: Locale
 }) {
   /* Колонка «Готово» бесконечная, поэтому нужен лимит и раскрытие (FR-155).
      Раскрываем на месте, а не ссылкой в ленту доски: роадмап сквозной по всем
@@ -103,19 +125,19 @@ function Column({
   return (
     <section className="flex flex-col rounded-card border border-line bg-surface p-4">
       <header className="mb-4 flex items-center justify-between gap-3">
-        <StatusBadge status={column.status} />
-        <span className="tnum text-small text-faint">{formatCount(column.total)}</span>
+        <StatusBadge status={column.status} lang={lang} />
+        <span className="tnum text-small text-faint">
+          {formatCount(column.total, lang)}
+        </span>
       </header>
 
       {column.items.length === 0 ? (
-        <p className="py-6 text-center text-small text-faint">
-          Пока пусто. Здесь появятся обращения, когда команда возьмёт их в работу.
-        </p>
+        <p className="py-6 text-center text-small text-faint">{t.roadmap.empty}</p>
       ) : (
         <ul className="space-y-3">
           {column.items.map((item) => (
             <li key={`${item.boardSlug}/${item.slug}`}>
-              <Card item={item} />
+              <Card item={item} lang={lang} />
             </li>
           ))}
         </ul>
@@ -127,18 +149,20 @@ function Column({
           scroll={false}
           className="mt-4 rounded-pill border border-line px-4 py-2 text-center text-small font-semibold text-ink-2 transition-colors hover:bg-track"
         >
-          {column.expanded ? 'Свернуть' : `Показать все ${formatCount(column.total)}`}
+          {column.expanded
+            ? t.roadmap.collapse
+            : fill(t.roadmap.showAll, { count: formatCount(column.total, lang) })}
         </Link>
       )}
     </section>
   )
 }
 
-function Card({ item }: { item: RoadmapCardView }) {
+function Card({ item, lang }: { item: RoadmapCardView; lang: Locale }) {
   return (
     <article className="border-t border-line pt-3">
       <p className="mb-1 text-small text-faint">
-        {item.typeName}
+        {localized(item.typeName, item.typeNameEn, lang)}
         {item.categoryName && ` · ${item.categoryName}`}
       </p>
       <h3 className="text-body font-semibold text-ink">
@@ -148,7 +172,12 @@ function Card({ item }: { item: RoadmapCardView }) {
       </h3>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-faint">
         <span className="tnum">
-          {formatCount(item.count)} {plural(item.count, item.countLabel)}
+          {formatCount(item.count, lang)}{' '}
+          {plural(
+            item.count,
+            localizedForms(item.countLabel, item.countLabelEn, lang),
+            lang,
+          )}
         </span>
         {item.eta && <span className="text-muted">{item.eta}</span>}
       </div>

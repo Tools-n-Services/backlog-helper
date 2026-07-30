@@ -1,12 +1,16 @@
 import type { Metadata } from 'next'
 
+import { content } from '@/core/locale'
 import {
   PrimaryAction,
   SecondaryAction,
   StateScreen,
 } from '@/ui/layout/state-screen'
 
-export const metadata: Metadata = { title: 'Ссылка не сработала' }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await content()
+  return { title: t.auth.failedTitle }
+}
 
 /**
  * Почему вход не состоялся.
@@ -15,37 +19,29 @@ export const metadata: Metadata = { title: 'Ссылка не сработала
  * не может понять, запросить ли новую ссылку, подождать или написать в
  * поддержку — а это три разных действия.
  */
-const FAILURES: Record<string, { title: string; text: string }> = {
-  invalid: {
-    title: 'Ссылка не подошла',
-    text: 'Возможно, она скопирована не целиком: почтовые клиенты переносят длинные ссылки на вторую строку, и половина остаётся в буфере.',
-  },
-  expired: {
-    title: 'Ссылка устарела',
-    text: 'Ссылка действует 15 минут — этого достаточно, чтобы дойти до почты, и недостаточно тому, кто найдёт письмо позже.',
-  },
-  used: {
-    title: 'Ссылка уже использована',
-    text: 'Каждая ссылка открывает вход ровно один раз. Если входили не вы — запросите новую и напишите нам.',
-  },
-}
-
-const FALLBACK = FAILURES.invalid!
-
 export default async function LoginFailedPage({
   searchParams,
 }: PageProps<'/login/failed'>) {
-  const { reason } = await searchParams
+  const [{ reason }, t] = await Promise.all([searchParams, content()])
+
+  const failures: Record<string, { title: string; text: string }> = {
+    invalid: { title: t.auth.failedInvalidTitle, text: t.auth.failedInvalidText },
+    expired: { title: t.auth.failedExpiredTitle, text: t.auth.failedExpiredText },
+    used: { title: t.auth.failedUsedTitle, text: t.auth.failedUsedText },
+  }
+
   const key = Array.isArray(reason) ? reason[0] : reason
-  const failure = (key && FAILURES[key]) || FALLBACK
+  /* Неизвестная причина сводится к «ссылка не подошла»: она самая частая
+     и её совет — запросить новую — верен в любом случае. */
+  const failure = (key && failures[key]) || failures.invalid!
 
   return (
     <StateScreen
       title={failure.title}
       actions={
         <>
-          <PrimaryAction href="/login">Запросить новую ссылку</PrimaryAction>
-          <SecondaryAction href="/">Читать обращения</SecondaryAction>
+          <PrimaryAction href="/login">{t.auth.requestNew}</PrimaryAction>
+          <SecondaryAction href="/">{t.auth.readPosts}</SecondaryAction>
         </>
       }
     >
