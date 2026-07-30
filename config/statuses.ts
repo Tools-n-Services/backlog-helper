@@ -12,6 +12,14 @@
 
 export type StatusShape = 'dot' | 'ring' | 'half' | 'check' | 'cross' | 'dash'
 
+/**
+ * Все формы маркера — для выбора в админке.
+ *
+ * Форма обязательна рядом с цветом: бейдж статуса должен читаться
+ * в оттенках серого (07-ui-brief.md, раздел 2).
+ */
+export const shapes: StatusShape[] = ['dot', 'ring', 'half', 'check', 'cross', 'dash']
+
 export interface StatusConfig {
   key: string
   name: string

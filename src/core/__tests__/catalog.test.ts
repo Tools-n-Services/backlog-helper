@@ -83,7 +83,11 @@ suite('справочники', () => {
     /* Снимок ещё старый: справочник читается не на каждый запрос. */
     assert.equal(catalog().statusByKey.has(TEMP_KEY), false)
 
+    /* Пометка устаревшим не обнуляет снимок: страница, которая уже рисуется,
+       обязана дочитать справочник, а не упасть посреди рендера. */
     invalidateCatalog()
+    assert.equal(catalogReady(), true)
+
     await loadCatalog()
     assert.equal(catalog().statusByKey.get(TEMP_KEY)?.name, 'Проверка')
 

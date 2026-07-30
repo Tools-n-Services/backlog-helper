@@ -118,8 +118,8 @@ export function settings(): Settings {
   return snapshot ?? defaultSettings()
 }
 
+/** Пометить настройки устаревшими: следующее чтение сходит в базу. */
 export function invalidateSettings(): void {
-  snapshot = null
   loadedAt = 0
 }
 

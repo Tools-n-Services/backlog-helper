@@ -68,6 +68,15 @@ export default async function AdminLayout({
             <AdminTab href="/admin/types" contour="intake">
               Формы
             </AdminTab>
+            <AdminTab href="/admin/boards" contour="intake">
+              Доски
+            </AdminTab>
+            <AdminTab href="/admin/statuses" contour="triage">
+              Статусы
+            </AdminTab>
+            <AdminTab href="/admin/settings" contour="backlog">
+              Настройки
+            </AdminTab>
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
@@ -96,6 +105,9 @@ function AdminTab({
     | '/admin/releases'
     | '/admin/people'
     | '/admin/types'
+    | '/admin/boards'
+    | '/admin/statuses'
+    | '/admin/settings'
   contour: 'intake' | 'triage' | 'backlog'
   children: React.ReactNode
 }) {
