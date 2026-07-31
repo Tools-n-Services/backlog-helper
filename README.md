@@ -1,299 +1,262 @@
 # backlog-helper
 
-**Бэклог как сервис, который вы разворачиваете у себя.** Клонируете репозиторий, правите
-конфиг и тему — получаете портал: пользователи присылают запросы и сообщения об ошибках,
-команда их разбирает, а продуктовый бэклог, роадмап и changelog собираются из этого же потока.
+**Русский:** [README.ru.md](README.ru.md) · **Docs:** [English](docs/en/) · [Español](docs/es/) · [Русский](docs/)
 
-Один клон = один продукт. Логика приезжает из общего апстрима, в клоне меняются только
-конфигурация, тексты и оформление.
+**A feedback portal you run yourself.** Users send feature requests and bug reports,
+the team triages them, and the product backlog, roadmap and changelog are built from
+that same stream.
+
+Install it on your own server with one command and configure it in the browser —
+no code to edit. One image serves any number of products: each gets its own domain,
+its own database and its own settings.
 
 ```
-   СБОР                    ТРИАЖ                   БЭКЛОГ
-обращения  ──────────►  решение по каждому  ──────────►  единицы работы
-(портал, виджет,        (подтвердить, смержить,     (приоритет, связь N:M
- email, саппорт, API)    запросить инфо, отклонить)   с обращениями, синк с трекером)
+   INTAKE                  TRIAGE                  BACKLOG
+requests   ──────────►  a decision on each  ──────────►  units of work
+(portal, widget,        (accept, merge,             (priority, N:M links
+ email, support, API)    ask for info, decline)      to requests, tracker sync)
      ▲                                                        │
-     └──────────── письма, роадмап, changelog ◄───────────────┘
-                        (замыкание цикла)
+     └──────────── email, roadmap, changelog ◄────────────────┘
+                        (closing the loop)
 ```
 
-Замыкание цикла — то, ради чего продукт нужен: закрытие элемента бэклога переводит
-связанные обращения в `completed` и рассылает письма всем, кто за них голосовал.
-Без этого портал остаётся стеной пожеланий.
+Closing the loop is the point of the whole thing: finishing a unit of work moves the
+linked requests to `completed` and emails everyone who voted for them. Without it,
+a portal is just a wall of wishes.
 
-Полное описание продукта — [docs/00-product.md](docs/00-product.md).
-Лендинг — [landing/](landing/): статическая страница на трёх языках, деплоится как есть
-(каталог `landing/` — корень сайта).
+## Deploy it
 
-| Что | Где |
-|---|---|
-| Русская версия | [landing/index.html](landing/index.html) |
-| English | [landing/en/index.html](landing/en/index.html) |
-| Español | [landing/es/index.html](landing/es/index.html) |
-| Общие стили и скрипт | [landing/styles.css](landing/styles.css), [landing/copy.js](landing/copy.js) |
-| Скриншоты портала | `landing/assets/` — пересъёмка: `node landing/capture.mjs` при запущенном `pnpm dev` |
-
-Языковые версии различаются только текстом: структура секций у них одна, поэтому правку
-контента нужно повторять во всех трёх файлах.
-
-## Старт
+A server with Docker and a domain pointed at it.
 
 ```bash
-git clone <template> feedback-myproduct && cd feedback-myproduct
-git remote rename origin upstream && git remote add origin <new-repo>
-cp .env.example .env
+cp .env.example .env      # fill in PORTAL_DOMAIN, POSTGRES_PASSWORD, INSTALL_TOKEN
+docker compose up -d
+```
+
+Then open `https://your-domain/install/enter?token=<INSTALL_TOKEN>` and walk the
+wizard: environment checks, name and domain, the set of boards and types, a test
+email, the owner. After that the wizard closes for good and the owner is already
+signed in — without an email, because email may not be working yet at that point.
+
+What comes up: Postgres with a volume, the app, the worker, and Caddy, which issues
+the certificate for your domain itself. Migrations are applied when the app starts.
+
+**A second product on the same server** — a copy of the directory with a different
+`.env` and its own project name:
+
+```bash
+docker compose -p second-portal up -d
+```
+
+Its own database, its own domain, the same image. The two share nothing: everything
+that makes them different lives in their databases.
+
+Two things worth knowing before going live. **Without the worker, email queues up and
+silently goes nowhere** — the most expensive mistake of a first install, because it
+looks like a problem with the mail channel. And `STORAGE_PROVIDER=file` only suits a
+single instance: attachments live in a volume that a second copy of the app cannot see.
+
+Step by step, with checks at every stage — [docs/en/12-install.md](docs/en/12-install.md).
+
+## Instructions
+
+- [docs/en/12-install.md](docs/en/12-install.md) — installation step by step, with
+  checks and a walkthrough of the usual failures.
+- [docs/en/11-manual.md](docs/en/11-manual.md) — user manual: for visitors, for the
+  team, for the administrator.
+- [docs/en/10-operate.md](docs/en/10-operate.md) — operations: the three layers of
+  configuration, and updating.
+
+## What is configurable, and where
+
+The layer decides what changes it and when. This is the main thing to understand
+about the portal.
+
+| Layer | What lives there | How it changes |
+|---|---|---|
+| **Admin** | name, mark, domain, language, sections, limits, waiting periods, brand colour, boards and categories, statuses, request types and their form fields | on the running portal, at once |
+| **Environment (`.env`)** | database URL, mail channel and its keys, storage, translator, install token | by restarting the container |
+| **Code (`config/*.ts`)** | field kinds, the meaning of system fields, the priority formula, the palette, attachment rules | by rebuilding the image |
+| **Never** | a board's `slug`, a status or type `key` once created | — breaks links and history |
+
+**Field kind is code, the set of fields is data.** The admin combines ready kinds
+(text, textarea, select, checkbox, URL, environment, attachments), names the fields
+and marks them required. A new *kind* is added in code.
+
+**System fields** are the ones with logic beyond the form: `severity` sets the
+first-response deadline and the order of the triage queue, `environment` feeds the
+diagnostics that are never public. They can be renamed, reordered and removed from
+the form — but not turned into something else, or prioritisation starts counting the
+wrong thing and nothing tells you.
+
+## Development
+
+```bash
 pnpm install
 pnpm db:up && pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-Дальше правится `config/product.ts` (название, домен, доски) и `theme/tokens.css`.
+**You do not need to install a database.** `pnpm db:up` brings up a real PostgreSQL
+from the `embedded-postgres` package into `.data/pg` — no Docker, nothing installed
+system-wide. What sticks out is an ordinary `DATABASE_URL`, so in production it simply
+points at a managed Postgres and the `db:*` commands are not needed there: the schema,
+the migrations and the code are the same.
 
-**База ставить не нужно.** `pnpm db:up` разворачивает настоящий PostgreSQL из пакета
-`embedded-postgres` в каталог `.data/pg` — без Docker и без установки СУБД в систему.
-Наружу торчит обычный `DATABASE_URL`, поэтому в проде он просто указывает на управляемый
-Postgres, а команды `db:*` там не нужны: схема, миграции и код одни и те же.
-
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `pnpm dev` | Дев-сервер |
-| `pnpm db:up` / `db:down` | Поднять и остановить локальный Postgres |
-| `pnpm db:migrate` | Применить миграции (`migrate deploy`, не `dev` — см. ниже) |
-| `pnpm db:seed` | Залить демонстрационные данные из `config/seed.ts` |
-| `pnpm db:reset` | Снести кластер и собрать заново: миграции + сид |
-| `pnpm db:verify` | Проверить, что триггеры, индексы и поиск на месте |
-| `pnpm db:bench` | Наполнить до 15 000 обращений и замерить ленту, роадмап, очередь |
-| `pnpm worker` | Фоновые проходы: публикация релизов по сроку, рассылка, перевод обращений, ожидание ответа, пересчёты, retention вложений, сверка (`--loop` — постоянно) |
-| `pnpm mail:check` | Проверить почтовый канал; с адресом — отправить пробное письмо |
-| `pnpm typecheck` | TypeScript без эмита |
+| `pnpm dev` | Dev server |
+| `pnpm db:up` / `db:down` | Start and stop the local Postgres |
+| `pnpm db:migrate` | Apply migrations (`migrate deploy`, not `dev` — see below) |
+| `pnpm db:seed` | Load demo data from `config/seed.ts` |
+| `pnpm db:reset` | Drop the cluster and rebuild it: migrations plus seed |
+| `pnpm db:verify` | Check that triggers, indexes and search are in place |
+| `pnpm db:bench` | Fill up to 15 000 requests and measure feed, roadmap, queue |
+| `pnpm worker` | Background passes: scheduled releases, mail, translation, waiting on authors, recalculations, attachment retention, reconciliation (`--loop` to keep running) |
+| `pnpm mail:check` | Check the mail channel; with an address, send a test letter |
+| `pnpm typecheck` | TypeScript, no emit |
 | `pnpm lint` | ESLint |
-| `pnpm test` | Юнит-тесты домена, запросов и мутаций (Vitest) |
-| `pnpm test:e2e` | Сценарные тесты (Playwright) |
+| `pnpm test` | Unit tests for the domain, queries and mutations (Vitest) |
+| `pnpm test:e2e` | Scenario tests (Playwright) |
 
-### Миграции пишутся руками
+### Migrations are written by hand
 
-`pnpm db:migrate` — это `prisma migrate deploy`. **`prisma migrate dev` запускать нельзя:**
-он сравнивает базу со схемой и «чинит» расхождения, а часть схемы Prisma выразить
-не умеет — генерируемую колонку `search_tsv`, частичные индексы, триггеры счётчиков.
-Один такой запуск молча снимает GIN-индексы, и поиск продолжает работать, просто
-перестаёт находить.
+`pnpm db:migrate` is `prisma migrate deploy`. **Never run `prisma migrate dev`:** it
+compares the database to the schema and "fixes" the differences, and part of the schema
+is beyond what Prisma can express — the generated `search_tsv` column, partial indexes,
+counter triggers. One such run silently drops the GIN indexes, and search keeps
+working, it just stops finding things.
 
-Черновик SQL для изменения схемы даёт `pnpm db:draft`; его правят руками и кладут
-новой папкой в `prisma/migrations/`. Проверить, что в базе всё на месте, — `pnpm db:verify`.
+`pnpm db:draft` produces a draft of the SQL; you edit it by hand and add it as a new
+folder under `prisma/migrations/`. `pnpm db:verify` checks that everything is in place.
 
-### Вложения
+## Two languages, and translation
 
-Файлы обращений хранит `STORAGE_PROVIDER`: `file` (по умолчанию) складывает их
-в `.data/uploads`, `s3` — в любое S3-совместимое хранилище (`S3_ENDPOINT`,
-`S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`; регион по умолчанию
-`us-east-1`, адресация path-style — так работают MinIO и российские хранилища).
+The interface speaks Russian and English. The language is chosen by cookie, then by
+the browser header, then by the portal setting. Copy lives in `content/ru.json` and
+`content/en.json`; the names of boards, statuses and types sit in the catalogue next
+to the main ones (`nameEn` and friends) — a single-language fork simply leaves them out.
 
-Бакет должен быть **закрытым**: файл всегда отдаёт приложение после проверки
-прав, потому что вложения бага по умолчанию `team_only` — на скриншоте чужие
-имена и номера заказов. Публичный бакет этого правила не знает.
+Requests and comments themselves are translated by `TRANSLATE_PROVIDER`: `off` (the
+default) means no translation, `claude` means Claude Haiku with `ANTHROPIC_API_KEY`.
+The source language is detected on submit, and the translation is done by a worker
+pass: a bug report must be saved even when someone else's service is silent — the same
+reason email goes out in its own pass. Without a key the pass does nothing and spends
+no attempts: requests wait in the queue.
 
-Принимаются только типы из `config/attachments.ts` — белый список, а не запрет
-исполняемых: расширений больше, чем успевают перечислить. Там же лимиты
-по типам и сроки: брошенная загрузка живёт сутки, вложения закрытого обращения
-— 90 дней после закрытия. Удаляет их проход `pnpm worker`, вместе с файлом
-в хранилище.
+The reader sees the translation marked "Translated from Russian" with a "show original"
+button. The mark is not decoration: before you answer someone's words, you should know
+whose they are — the author's or a machine's.
 
-### Инструкции
+## Email
 
-- [docs/12-install.md](docs/12-install.md) — установка пошагово, с проверками
-  и разбором частых отказов.
-- [docs/11-manual.md](docs/11-manual.md) — пользовательская: посетителю, команде,
-  администратору.
-- [docs/10-operate.md](docs/10-operate.md) — эксплуатация: три слоя настройки
-  и обновление.
+Sign-in, team replies and status changes all rest on email, so the delivery channel is
+set by `MAIL_PROVIDER`:
 
-### Развернуть на сервере
-
-Нужен сервер с Docker и домен, направленный на него A-записью.
-
-```
-cp .env.example .env      # заполните PORTAL_DOMAIN, POSTGRES_PASSWORD, INSTALL_TOKEN
-docker compose up -d
-```
-
-Дальше откройте `https://ваш-домен/install/enter?token=<INSTALL_TOKEN>` и пройдите
-мастер: проверка среды, название и домен, набор досок и типов, пробное письмо,
-владелец. После установки мастер закрывается навсегда, а владелец оказывается
-внутри — без письма, потому что письма к этому моменту может не работать.
-
-Что поднимается: Postgres с томом, приложение, воркер и Caddy, который сам
-выписывает сертификат по указанному домену. Миграции применяются при старте
-приложения — отдельной командой их запускать не нужно.
-
-**Второй продукт на том же сервере** — копия каталога с другим `.env`
-и своим именем проекта:
-
-```
-docker compose -p второй-портал up -d
-```
-
-Своя база, свой домен, тот же образ. Настройки у них общего ничего не имеют:
-всё, что отличает продукты, лежит в их базах.
-
-Две вещи стоит знать до боевого запуска. Без воркера письма встают в очередь
-и молча никуда не уходят — это самая дорогая ошибка первой установки, потому
-что выглядит как проблема почтового канала. И `STORAGE_PROVIDER=file` годится
-для одного инстанса: вложения лежат в томе, и вторая копия приложения их
-не увидит — для неё нужен S3.
-
-### Два языка и перевод обращений
-
-Интерфейс говорит по-русски и по-английски: язык выбирается кукой, а до неё —
-заголовком браузера, а до него — `product.locale`. Тексты живут в `content/ru.json`
-и `content/en.json`, названия досок, статусов и типов — в `config/` рядом
-с основными (`nameEn`, `countLabelEn` и подобные): у форка с одним языком их
-просто нет.
-
-Сами обращения и комментарии переводит `TRANSLATE_PROVIDER`: `off` (по умолчанию)
-— перевода нет, `claude` — Claude Haiku по `ANTHROPIC_API_KEY`. Язык оригинала
-определяется при отправке, а перевод делает отдельный проход `pnpm worker`:
-багрепорт обязан сохраниться, даже когда чужой сервис молчит — по той же причине,
-по которой письма уходят отдельным проходом. Без ключа проход ничего не делает
-и не тратит попыток: обращения дождутся ключа в очереди.
-
-Читателю перевод показывается с пометкой «Переведено с русского» и кнопкой
-«показать оригинал». Пометка обязательна: читатель должен знать, чьи перед ним
-слова — автора или машины, — прежде чем на них отвечать.
-
-### Письма
-
-Вход, ответы команды и смена статуса держатся на письмах, поэтому канал доставки
-настраивается `MAIL_PROVIDER`:
-
-| Значение | Что делает |
+| Value | What it does |
 |---|---|
-| `file` (по умолчанию) | Складывает письма в `.data/mail` и печатает в консоль — вход по ссылке работает на свежем клоне без единого внешнего сервиса |
-| `log` | Только консоль |
-| `smtp` | Настоящая доставка через почтовый сервер организации |
-| `unisender` | Unisender Go: российский сервис, оплата в рублях; нужен `UNISENDER_API_KEY` |
-| `resend` | Доставка через HTTP-API, если SMTP закрыт наружу; нужен `RESEND_API_KEY` |
+| `file` (default) | Writes letters into `.data/mail` and prints them — sign-in by link works on a fresh clone without a single external service |
+| `log` | Console only |
+| `smtp` | Real delivery through your organisation's mail server |
+| `unisender` | Unisender Go; needs `UNISENDER_API_KEY` |
+| `resend` | Delivery over HTTP API when SMTP is blocked outbound; needs `RESEND_API_KEY` |
 
-Разница между SMTP и HTTP-API не в надёжности, а в том, что закрыто в сети
-развёртывания: порт 587 наружу закрывают чаще, чем 443.
+The difference between SMTP and an HTTP API is not reliability but what your network
+blocks: port 587 outbound is closed more often than 443.
 
-Настоящая отправка требует трёх вещей, и не хватает обычно третьей.
+Real delivery needs three things, and it is usually the third one that is missing.
 
-**1. Канал.** Для `smtp` — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`.
-Порт 587 означает STARTTLS, 465 — TLS с первого байта (`SMTP_SECURE=1`).
-`SMTP_USER` без `SMTP_PASSWORD` считается ошибкой, а не релеем без входа:
-это почти всегда забытая переменная. Отправитель по умолчанию — сам логин,
-потому что почтовые серверы отвергают письма, в которых `From` не совпадает
-с ящиком подключения; переопределяется `MAIL_FROM`.
+**1. A channel.** For `smtp` — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`.
+Port 587 means STARTTLS, 465 means TLS from the first byte (`SMTP_SECURE=1`).
+`SMTP_USER` without `SMTP_PASSWORD` is treated as an error rather than an open relay:
+it is almost always a forgotten variable.
 
-Для `resend` — `RESEND_API_KEY`. Общий отправитель сервиса
-`onboarding@resend.dev` работает без подтверждения домена, но письма уходят
-только на адрес владельца аккаунта: он годится проверить канал, а не рассылать
-подписчикам. Для рассылки нужен свой подтверждённый домен.
+For `resend` — `RESEND_API_KEY`, and your own verified domain if you want to write to
+anyone but the account owner. For `unisender` — `UNISENDER_API_KEY`, and the sender
+domain must be verified in their panel; a letter from someone else's domain is
+rejected, and that is the most common failure at the start.
 
-Для `unisender` — `UNISENDER_API_KEY`, и домен отправителя должен быть
-подтверждён в панели сервиса: письмо с чужого домена отвергается, и это самая
-частая причина отказа на старте. `UNISENDER_API_URL` переключает на европейскую
-площадку. Сервис по умолчанию дописывает свою ссылку отписки; отключается
-`UNISENDER_SKIP_UNSUBSCRIBE=1` после разрешения поддержки — поэтому это выбор
-владельца портала, а не умолчание кода.
+**2. The portal address.** `PORTAL_ORIGIN` goes into the links inside letters — that is
+how people come back. Without it the letter still arrives, and the link inside leads
+nowhere.
 
-**2. Адрес портала.** `PORTAL_ORIGIN` попадает в ссылки внутри писем — по ним
-человек и возвращается. Без переменной берётся домен из `config/product.ts`,
-и на чужом развёртывании письмо дойдёт, а ссылка в нём приведёт в пустоту.
+**3. The worker.** Letters to subscribers do not go out from the request that changes
+the status: the change leaves a row in `status_change`, and `pnpm worker` does the
+sending. Otherwise an unavailable mail server would roll back the status change itself.
+So without a running worker there is no email at all, however correctly the channel is
+configured.
 
-**3. Воркер.** Письма подписчикам не уходят из запроса, который меняет статус:
-смена оставляет строку в `status_change`, а рассылкой занимается `pnpm worker`.
-Иначе недоступность почты откатывала бы саму смену статуса — обращение осталось
-бы в старом статусе из-за чужого сбоя (FR-309). Значит, без запущенного воркера
-писем не будет вообще, сколько бы правильно ни был настроен канал: в проде он
-ставится в cron или запускается с `--loop`.
-
-Проверить всё это разом — `pnpm mail:check`; с адресом он ещё и отправит
-пробное письмо:
+Check all of it at once with `pnpm mail:check`; with an address it also sends a test
+letter:
 
 ```bash
 pnpm mail:check you@example.com
 ```
 
-Проверка нужна из-за того, как неверная настройка проявляется: письмо ставится
-в очередь, проход отчитывается «не доставлено, повторим», и так по кругу — без
-единой строки о причине.
+## Roles and access
 
-## Что правится в клоне
+Four levels — [src/core/permissions.ts](src/core/permissions.ts). Powers are nested:
+each role can do everything the previous one can.
 
-| | Где | Что |
-|---|---|---|
-| ✅ | `config/` | Доски, типы обращений, статусы, формула приоритета, лимиты, фичефлаги |
-| ✅ | `theme/tokens.css` | Цвета, радиусы, тени, шрифты |
-| ✅ | `content/ru.json` | Все пользовательские тексты |
-| ✅ | `src/ui/` | Вёрстка и компоненты |
-| ⛔ | `src/core/` | Домен, схема БД, запросы, интеграции — общее для всех клонов |
-
-Правила целиком — [docs/03-architecture.md](docs/03-architecture.md#правила-форка).
-
-## Роли и доступ
-
-Портал различает четыре уровня — [src/core/permissions.ts](src/core/permissions.ts).
-Полномочия вложены: каждая следующая роль умеет всё, что предыдущая.
-
-| Роль | Что может |
+| Role | What it can do |
 |---|---|
-| Пользователь | Читает, голосует, пишет обращения и комментарии |
-| Модератор | Плюс очередь модерации и решения триажа |
-| Администратор | Плюс объединение обращений и блокировка людей |
-| Владелец | Плюс назначение ролей |
+| User | Reads, votes, writes requests and comments |
+| Moderator | Plus the moderation queue and triage decisions |
+| Administrator | Plus merging requests, blocking people, and portal settings |
+| Owner | Plus assigning roles |
 
-Права проверяются в серверных действиях, а не только скрытием кнопок: скрытая
-кнопка не мешает отправить тот же запрос напрямую. Три запрета жёсткие и живут
-в домене: роль выше своей не выдать, себе роль не поменять, последнего владельца
-не разжаловать.
+Permissions are checked in server actions, not only by hiding buttons: a hidden button
+does not stop anyone from sending the same request directly. Three prohibitions are
+hard and live in the domain: you cannot grant a role above your own, you cannot change
+your own role, and you cannot demote the last owner.
 
-Пароля нет — вход по одноразовой ссылке на почту. После `pnpm db:seed` в консоли
-печатаются адреса демонстрационных учётных записей: этого достаточно, чтобы войти
-любой ролью.
+There are no passwords — sign-in is a one-time link by email.
 
-## Статус
+## Status
 
-Портал полноценный: читает, пишет, рассылает письма и управляется командой.
+The portal is complete: it reads, writes, sends email and is run by a team.
 
-Готово: схема из [02-data-model.md](docs/02-data-model.md) целиком, миграции с триггерами
-счётчиков, вход по одноразовой ссылке с серверными сессиями, голоса с гарантией
-уникальным индексом, создание обращений с лимитами, комментарии, подписки, гибридный
-поиск (полнотекстовый плюс триграммы), очередь модерации, решения триажа с обязательной
-причиной, объединение обращений с дедупликацией голосов, управление ролями и блокировками,
-письма о статусах и ответах с настройками в профиле, настоящая доставка почты
-(SMTP, Unisender Go, Resend), авто-закрытие обращений без ответа автора, фоновые
-пересчёты и сверка счётчиков, бэклог как единицы работы со связью N:M и фазами,
-приоритизация с вычисляемым охватом, деньгами и инсайтами, редактор релизов,
-вложения с правами и retention.
+Done: the whole schema from [02-data-model.md](docs/02-data-model.md), migrations with
+counter triggers, sign-in by one-time link with server sessions, votes guaranteed by a
+unique index, request intake with rate limits, comments, subscriptions, hybrid search
+(full text plus trigrams), the moderation queue, triage decisions with a mandatory
+reason, merging with vote deduplication, roles and blocking, email about statuses and
+replies with per-user settings, real delivery (SMTP, Unisender Go, Resend),
+auto-closing requests the author never answered, background recalculations, the backlog
+as units of work with N:M links, prioritisation with computed reach, money and insights,
+the release editor, attachments with permissions and retention, two interface languages
+with translation of requests, the install wizard, and configuration from the admin.
 
-**Цикл замкнут:** смена внутреннего этапа работы переводит связанные обращения
-в публичный статус и ставит письма в очередь, а публикация записи changelog закрывает
-их и рассылает «то, что вы просили, вышло». Внутренние этапы вроде «в проверке»
-пользователю не видны и писем не рассылают.
+**The loop is closed:** moving a unit of work to another internal stage moves the linked
+requests to a public status and queues the letters; publishing a changelog entry closes
+them and sends "the thing you asked for has shipped". Internal stages such as "in review"
+are invisible to users and send nothing.
 
-Нагрузка проверена: 15 000 обращений и 450 000 голосов, все ключевые запросы укладываются
-в 500 мс на p95 — числа в [08-dev-plan.md](docs/08-dev-plan.md#н1--нагрузка-15-000-обращений).
+Load has been measured: 15 000 requests and 450 000 votes, all key queries within 500 ms
+at p95.
 
-**Приоритет считается, а не вводится:** охват — уникальные затронутые люди
-с весами сегментов, с дедупликацией по человеку через голоса, объединённые
-дубликаты и цитаты; деньги — сумма MRR по уникальным компаниям; итог — формула
-из конфига (по умолчанию RICE). Ручной порядок остаётся главным: расчёт — подсказка.
+Not done: drag ranking, tracker sync, bug deduplication by fingerprint, the intake widget
+and API, backups out of the box, account deletion with anonymisation.
 
-Не сделано: ранжирование перетаскиванием, синхронизация с трекером,
-авто-дедупликация багов по fingerprint, виджет и API приёма. Что и в каком порядке —
-[план](docs/08-dev-plan.md#что-осталось-до-полноценного-сервиса).
+## Documentation
 
-## Документация
+The design documents are in Russian and are the source of truth. The operational ones
+exist in three languages.
 
-| Документ | О чём |
+| Document | About |
 |---|---|
-| [00-product.md](docs/00-product.md) | Описание продукта: проблема, для кого, что входит, отличия от альтернатив |
-| [01-functional-spec.md](docs/01-functional-spec.md) | Требования: публичная часть, админка, уведомления, интеграции |
-| [02-data-model.md](docs/02-data-model.md) | Сущности, индексы, инварианты merge и голосов |
-| [03-architecture.md](docs/03-architecture.md) | Стек, структура репозитория, правила клонирования |
-| [04-delivery-plan.md](docs/04-delivery-plan.md) | Этапы поставки и что мерить после запуска |
-| [05-bug-intake.md](docs/05-bug-intake.md) | Приём багов: качество, диагностика, триаж, приватность |
-| [06-backlog.md](docs/06-backlog.md) | Бэклог: приоритизация, инсайты, синк с трекером |
-| [07-ui-brief.md](docs/07-ui-brief.md) | Дизайн-бриф: поверхности, токены, состояния |
-| [08-dev-plan.md](docs/08-dev-plan.md) | План разработки по итерациям и текущий статус |
+| [en](docs/en/12-install.md) · [es](docs/es/12-install.md) · [ru](docs/12-install.md) | Installation step by step |
+| [en](docs/en/11-manual.md) · [es](docs/es/11-manual.md) · [ru](docs/11-manual.md) | User manual |
+| [en](docs/en/10-operate.md) · [es](docs/es/10-operate.md) · [ru](docs/10-operate.md) | Deploy, configure, update |
+| [00-product.md](docs/00-product.md) | Product description: the problem, who it is for, how it differs |
+| [01-functional-spec.md](docs/01-functional-spec.md) | Requirements: public side, admin, notifications, integrations |
+| [02-data-model.md](docs/02-data-model.md) | Entities, indexes, invariants of merge and votes |
+| [03-architecture.md](docs/03-architecture.md) | Stack, repository layout, fork rules |
+| [05-bug-intake.md](docs/05-bug-intake.md) | Bug intake: quality, diagnostics, triage, privacy |
+| [06-backlog.md](docs/06-backlog.md) | Backlog: prioritisation, insights, tracker sync |
+| [07-ui-brief.md](docs/07-ui-brief.md) | Design brief: surfaces, tokens, states |
+| [08-dev-plan.md](docs/08-dev-plan.md) | Development plan by iteration and current status |
+| [09-install.md](docs/09-install.md) | How installation and in-database configuration are built |
+
+The landing page lives in [landing/](landing/) — a static page in three languages,
+deployed as is.

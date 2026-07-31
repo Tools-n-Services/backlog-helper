@@ -17,5 +17,7 @@ COPY landing/es /srv/es
 # ссылками, и работают они независимо от того, что сейчас в ветке по
 # умолчанию и останется ли репозиторий публичным.
 COPY docs/*.md /srv/docs/
+COPY docs/en /srv/docs/en
+COPY docs/es /srv/docs/es
 
 EXPOSE 80 8000
