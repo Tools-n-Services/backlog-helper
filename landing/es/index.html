@@ -21,7 +21,7 @@
     <title>backlog-helper — portal de feedback, errores y backlog en código abierto</title>
     <meta
       name="description"
-      content="Portal de feedback de código abierto: solicitudes de funciones, reportes de errores, triaje, backlog, roadmap y changelog. Clona el repositorio y despliégalo en tu infraestructura."
+      content="Portal de feedback de código abierto: solicitudes de funciones, reportes de errores, triaje, backlog, roadmap y changelog. Un comando en tu servidor y un asistente en el navegador."
     />
     <meta property="og:type" content="website" />
     <meta
@@ -30,7 +30,7 @@
     />
     <meta
       property="og:description"
-      content="Solicitudes, reportes de errores, triaje, backlog, roadmap y changelog en un solo modelo de datos. Código abierto, autoalojado, un clon por producto."
+      content="Solicitudes, reportes de errores, triaje, backlog, roadmap y changelog en un solo modelo de datos. Código abierto, autoalojado, una imagen para todos los productos."
     />
     <meta property="og:locale" content="es_ES" />
     <link rel="alternate" hreflang="ru" href="../index.html" />
@@ -51,10 +51,10 @@
 
     <div class="banner">
       <div class="page banner__inner">
-        <span class="banner__tag">en desarrollo</span>
+        <span class="banner__tag">listo para instalar</span>
         <span
-          >El portal público y la cola de triaje ya son navegables; la siguiente iteración
-          sustituye los datos de prueba por Postgres.</span
+          >El portal se instala en tu servidor en quince minutos y se configura
+          en el navegador, sin tocar código.</span
         >
         <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
           >Plan de desarrollo →</a
@@ -99,19 +99,18 @@
           <h1>Backlog como <b>servicio</b></h1>
           <p class="lead">
             Portal de feedback de código abierto: solicitudes de funciones y reportes de
-            errores, triaje, backlog, roadmap y changelog. Clonas el repositorio y el
-            servicio es tuyo.
+            errores, triaje, backlog, roadmap y changelog. Un comando en tu servidor
+            y un asistente en el navegador.
           </p>
 
           <div class="cmd">
             <code id="clone-cmd"
-              ><span class="p">$</span> git clone
-              https://github.com/Tools-n-Services/backlog-helper</code
+              ><span class="p">$</span> docker compose up -d</code
             >
             <button
               type="button"
               id="copy-btn"
-              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copy="docker compose up -d"
               data-copied="Comando copiado"
               data-copy-failed="No se pudo copiar: selecciona el comando manualmente"
             >
@@ -121,18 +120,16 @@
           <p aria-live="polite" id="copy-status" class="cmd__status"></p>
 
           <div class="hero__actions">
-            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
-              >Obtener el repositorio</a
+            <a class="btn btn--primary" href="../docs/12-install.md"
+              >Cómo desplegarlo</a
             >
-            <a
-              class="btn btn--ghost"
-              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
-              >Descripción del producto</a
+            <a class="btn btn--ghost" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Código en GitHub</a
             >
           </div>
 
           <p class="hero__stack">
-            Next.js · PostgreSQL · autoalojado · un clon por producto
+            Next.js · PostgreSQL · autoalojado · una imagen para todos los productos
           </p>
 
           <div class="shot shot--raised hero__shot">
@@ -324,7 +321,21 @@
             </li>
             <li>
               <b>Sin segundo registro</b>
-              <span>Magic link, OAuth por configuración y SSO desde tu producto con un token firmado.</span>
+              <span>Un enlace por correo, sin contraseña. Leer el portal no exige entrar.</span>
+            </li>
+            <li>
+              <b>Configuración sin código</b>
+              <span
+                >Tableros, estados, campos de los formularios, límites y el color de
+                marca se editan en la administración y se aplican al instante.</span
+              >
+            </li>
+            <li>
+              <b>Dos idiomas y traducción</b>
+              <span
+                >Interfaz en ruso e inglés; las solicitudes en otro idioma se traducen,
+                con una marca y el original a un clic.</span
+              >
             </li>
             <li>
               <b>SEO desde el inicio</b>
@@ -338,32 +349,33 @@
       <section id="start" style="border-top: 1px solid var(--line)">
         <div class="page">
           <p class="label">Empezar</p>
-          <h2>Un clon por producto, <b>actualizaciones desde upstream</b></h2>
+          <h2>Instalado por un asistente, <b>configurado en el navegador</b></h2>
           <p class="lead" style="margin-top: 18px">
-            Una instancia atiende a un producto. La lógica sigue siendo común y llega como
-            actualización; en el clon solo viven la configuración, los textos y el tema.
+            Una instancia atiende a un producto: su base de datos, su dominio y sus
+            ajustes. La imagen es común; el fork solo hace falta para cambiar código.
           </p>
 
           <ol class="steps">
             <li>
-              <b>Clonar</b>
+              <b>Levantarlo</b>
               <span
-                >Fork o clon, <code>pnpm install</code>, <code>pnpm dev</code>: el portal
-                se abre de inmediato.</span
+                >Un servidor con Docker y un dominio apuntando a él.
+                <code>docker compose up -d</code>: base de datos, portal, worker y un
+                proxy con certificado.</span
               >
             </li>
             <li>
-              <b>Ajustar configuración y tema</b>
+              <b>Pasar el asistente</b>
               <span
-                >Tableros y estados en <code>config/</code>, colores y tipografías en
-                <code>theme/tokens.css</code>, textos en <code>content/</code>.</span
+                >Comprobación del entorno, nombre y dominio, conjunto de tableros y
+                tipos, correo de prueba y propietario. Cinco pasos.</span
               >
             </li>
             <li>
-              <b>Mantenerse al día</b>
+              <b>Ajustarlo a tu producto</b>
               <span
-                ><code>git merge upstream/main</code>: la lógica común de
-                <code>src/core/</code> no se toca en el clon.</span
+                >Tableros, estados, campos de los formularios y apariencia, desde la
+                administración. Nada que reconstruir.</span
               >
             </li>
           </ol>
@@ -383,14 +395,14 @@
                 <p>
                   La parte pública y la cola de triaje están construidas y son navegables,
                   y las reglas de dominio son reales: tendencia, búsqueda de parecidos,
-                  deduplicación de votos, SLA y límites. Los datos todavía vienen de
-                  fixtures: Postgres, las mutaciones reales y los correos son las
-                  siguientes iteraciones.
+                  deduplicación de votos, SLA y límites. Todo corre sobre Postgres:
+                  entrada por correo, mutaciones reales, cartas, adjuntos, triaje,
+                  backlog y publicación de versiones.
                 </p>
                 <p>
-                  El prototipo no se tira: está hecho sobre el stack definitivo y le falta
-                  exactamente una capa, la fuente de datos detrás del contrato
-                  <code>src/queries/</code>.
+                  Lo que todavía no hay: copias de seguridad de fábrica, borrado de
+                  cuenta con anonimización y el widget de reporte de errores. Está en
+                  el plan y se nombra con franqueza en vez de esconderse.
                 </p>
               </div>
             </details>
@@ -417,9 +429,9 @@
               <div class="answer">
                 <p>
                   No, y es deliberado: en el esquema no existe <code>tenant_id</code>. Cada
-                  producto tiene su clon, su base de datos y su dominio. El coste es
-                  actualizar N instancias; la ganancia es un esquema simple y libertad
-                  total para rediseñar.
+                  producto tiene su instancia, su base de datos y su dominio; la imagen
+                  es común. El coste es actualizar N instalaciones; la ganancia es un
+                  esquema simple y aislamiento total de los datos.
                 </p>
               </div>
             </details>
@@ -428,11 +440,11 @@
               <summary>¿Qué hace falta para desplegarlo?</summary>
               <div class="answer">
                 <p>
-                  Node y pnpm para levantar el portal en local. Después: PostgreSQL y
-                  almacenamiento compatible con S3 para los adjuntos, más una clave de
-                  proveedor de correo; la cola de tareas en segundo plano vive dentro de
-                  Postgres, así que no hace falta un Redis aparte. El despliegue puede ser
-                  con Docker o en Vercel: ambas rutas están descritas en la arquitectura.
+                  Un servidor con Docker y un dominio. Lo demás sube con
+                  <code>docker compose up -d</code>: PostgreSQL, el portal, el worker y un
+                  proxy que emite el certificado por su cuenta. Hará falta también un
+                  canal de correo —la entrada funciona por correo— y almacenamiento S3
+                  si ejecutas más de una copia de la aplicación.
                 </p>
               </div>
             </details>

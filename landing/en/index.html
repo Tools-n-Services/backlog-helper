@@ -21,13 +21,13 @@
     <title>backlog-helper — open-source feedback, bug and backlog portal</title>
     <meta
       name="description"
-      content="Open-source feedback portal: feature requests, bug reports, triage, backlog, roadmap and changelog. Clone the repository and run it yourself."
+      content="Open-source feedback portal: feature requests, bug reports, triage, backlog, roadmap and changelog. One command on your server, then a wizard in the browser."
     />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="backlog-helper — open-source feedback and backlog portal" />
     <meta
       property="og:description"
-      content="Requests, bug reports, triage, backlog, roadmap and changelog in one data model. Open source, self-hosted, one clone per product."
+      content="Requests, bug reports, triage, backlog, roadmap and changelog in one data model. Open source, self-hosted, one image for every product."
     />
     <meta property="og:locale" content="en_US" />
     <link rel="alternate" hreflang="ru" href="../index.html" />
@@ -48,10 +48,10 @@
 
     <div class="banner">
       <div class="page banner__inner">
-        <span class="banner__tag">work in progress</span>
+        <span class="banner__tag">ready to install</span>
         <span
-          >The public portal and the triage queue are already clickable; the next
-          iteration replaces fixtures with Postgres.</span
+          >The portal installs on your own server in fifteen minutes and is
+          configured in the browser — no code to edit.</span
         >
         <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
           >Development plan →</a
@@ -96,18 +96,18 @@
           <h1>Backlog as a <b>service</b></h1>
           <p class="lead">
             An open-source feedback portal: feature requests and bug reports, triage,
-            backlog, roadmap and changelog. Clone the repository — the service is yours.
+            backlog, roadmap and changelog. One command on your server, then a wizard
+            in the browser.
           </p>
 
           <div class="cmd">
             <code id="clone-cmd"
-              ><span class="p">$</span> git clone
-              https://github.com/Tools-n-Services/backlog-helper</code
+              ><span class="p">$</span> docker compose up -d</code
             >
             <button
               type="button"
               id="copy-btn"
-              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copy="docker compose up -d"
               data-copied="Command copied"
               data-copy-failed="Copy failed — select the command manually"
             >
@@ -117,17 +117,15 @@
           <p aria-live="polite" id="copy-status" class="cmd__status"></p>
 
           <div class="hero__actions">
-            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
-              >Get the repository</a
+            <a class="btn btn--primary" href="../docs/12-install.md"
+              >How to deploy</a
             >
-            <a
-              class="btn btn--ghost"
-              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
-              >Product overview</a
+            <a class="btn btn--ghost" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Source on GitHub</a
             >
           </div>
 
-          <p class="hero__stack">Next.js · PostgreSQL · self-hosted · one clone per product</p>
+          <p class="hero__stack">Next.js · PostgreSQL · self-hosted · one image for every product</p>
 
           <div class="shot shot--raised hero__shot">
             <img
@@ -319,7 +317,21 @@
             </li>
             <li>
               <b>No second sign-up</b>
-              <span>Magic link, OAuth via config, SSO from your product with a signed token.</span>
+              <span>A link by email, no password. Reading the portal needs no sign-in at all.</span>
+            </li>
+            <li>
+              <b>Configured without code</b>
+              <span
+                >Boards, statuses, form fields, limits and the brand colour are edited
+                in the admin and apply at once.</span
+              >
+            </li>
+            <li>
+              <b>Two languages, with translation</b>
+              <span
+                >Russian and English interface; requests in another language are
+                translated, marked as such, with the original one click away.</span
+              >
             </li>
             <li>
               <b>SEO out of the box</b>
@@ -333,32 +345,33 @@
       <section id="start" style="border-top: 1px solid var(--line)">
         <div class="page">
           <p class="label">Get started</p>
-          <h2>A clone per product, <b>updates from upstream</b></h2>
+          <h2>Installed by a wizard, <b>configured in the browser</b></h2>
           <p class="lead" style="margin-top: 18px">
-            One instance serves one product. The logic stays shared and arrives as
-            updates, while the clone only owns config, copy and theme.
+            One instance serves one product: its own database, its own domain, its own
+            settings. The image is shared — a fork is only needed to change code.
           </p>
 
           <ol class="steps">
             <li>
-              <b>Clone it</b>
+              <b>Bring it up</b>
               <span
-                >Fork or clone, <code>pnpm install</code>, <code>pnpm dev</code> — the
-                portal opens right away.</span
+                >A server with Docker and a domain pointed at it.
+                <code>docker compose up -d</code> — database, portal, worker and a proxy
+                with a certificate.</span
               >
             </li>
             <li>
-              <b>Edit config and theme</b>
+              <b>Walk the wizard</b>
               <span
-                >Boards and statuses in <code>config/</code>, colours and fonts in
-                <code>theme/tokens.css</code>, copy in <code>content/</code>.</span
+                >Environment checks, name and domain, the set of boards and types,
+                a test email, the owner. Five steps.</span
               >
             </li>
             <li>
-              <b>Stay up to date</b>
+              <b>Make it yours</b>
               <span
-                ><code>git merge upstream/main</code> — the shared logic in
-                <code>src/core/</code> is never edited in a clone.</span
+                >Boards, statuses, form fields and appearance — in the admin. Nothing
+                to rebuild.</span
               >
             </li>
           </ol>
@@ -378,13 +391,13 @@
                 <p>
                   The public side and the triage queue are built and clickable, and the
                   domain rules are real: trending, duplicate search, vote deduplication,
-                  SLA, rate limits. Data still comes from fixtures — Postgres, real
-                  mutations and email are the next iterations.
+                  SLA, rate limits. It all runs on Postgres: sign-in by email, real
+                  mutations, letters, attachments, triage, backlog and releases.
                 </p>
                 <p>
-                  The prototype is not throwaway: it is built on the target stack, and
-                  exactly one layer is missing — the data source behind the
-                  <code>src/queries/</code> contract.
+                  What is not there yet: backups out of the box, account deletion with
+                  anonymisation, and the in-app bug widget. All of it is in the plan
+                  and named honestly rather than hidden.
                 </p>
               </div>
             </details>
@@ -422,11 +435,11 @@
               <summary>What do I need to deploy it?</summary>
               <div class="answer">
                 <p>
-                  Node and pnpm to run the portal locally. After that: PostgreSQL and
-                  S3-compatible storage for attachments, plus an email provider key; the
-                  background job queue lives inside Postgres, so no separate Redis is
-                  needed. Deploy with Docker or on Vercel — both paths are described in the
-                  architecture doc.
+                  A server with Docker and a domain. Everything else comes up with
+                  <code>docker compose up -d</code>: PostgreSQL, the portal, the worker
+                  and a proxy that issues the certificate itself. You will also need an
+                  email channel — sign-in works by email — and S3 storage if you run more
+                  than one copy of the app.
                 </p>
               </div>
             </details>

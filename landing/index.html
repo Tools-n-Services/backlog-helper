@@ -25,13 +25,13 @@
     <title>backlog-helper — открытый портал обратной связи, ошибок и бэклога</title>
     <meta
       name="description"
-      content="Open source портал обратной связи: запросы функций, сообщения об ошибках, триаж, бэклог, роадмап и changelog. Клонируете репозиторий и разворачиваете у себя."
+      content="Open source портал обратной связи: запросы функций, сообщения об ошибках, триаж, бэклог, роадмап и changelog. Ставится на свой сервер одной командой и настраивается в браузере."
     />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="backlog-helper — открытый портал обратной связи и бэклога" />
     <meta
       property="og:description"
-      content="Сбор запросов и ошибок, триаж, бэклог, роадмап и changelog в одной модели данных. Open source, self-hosted, один клон на продукт."
+      content="Сбор запросов и ошибок, триаж, бэклог, роадмап и changelog в одной модели данных. Open source, self-hosted, один образ на все продукты."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -52,10 +52,10 @@
 
     <div class="banner">
       <div class="page banner__inner">
-        <span class="banner__tag">в разработке</span>
+        <span class="banner__tag">готов к установке</span>
         <span
-          >Публичный портал и очередь триажа уже кликаются, следующая итерация —
-          Postgres вместо фикстур.</span
+          >Портал ставится на свой сервер за пятнадцать минут и настраивается
+          в браузере — без правки кода.</span
         >
         <a href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/08-dev-plan.md"
           >План разработки →</a
@@ -100,19 +100,18 @@
           <h1>Бэклог как <b>сервис</b></h1>
           <p class="lead">
             Открытый портал обратной связи: запросы функций и сообщения об ошибках,
-            триаж, бэклог, роадмап и changelog. Клонируете репозиторий — получаете
-            сервис у себя.
+            триаж, бэклог, роадмап и changelog. Разворачивается на вашем сервере
+            одной командой, настраивается мастером в браузере.
           </p>
 
           <div class="cmd">
             <code id="clone-cmd"
-              ><span class="p">$</span> git clone
-              https://github.com/Tools-n-Services/backlog-helper</code
+              ><span class="p">$</span> docker compose up -d</code
             >
             <button
               type="button"
               id="copy-btn"
-              data-copy="git clone https://github.com/Tools-n-Services/backlog-helper"
+              data-copy="docker compose up -d"
               data-copied="Команда скопирована"
               data-copy-failed="Не удалось скопировать — выделите команду вручную"
             >
@@ -122,18 +121,16 @@
           <p aria-live="polite" id="copy-status" class="cmd__status"></p>
 
           <div class="hero__actions">
-            <a class="btn btn--primary" href="https://github.com/Tools-n-Services/backlog-helper"
-              >Забрать репозиторий</a
+            <a class="btn btn--primary" href="docs/12-install.md"
+              >Как развернуть</a
             >
-            <a
-              class="btn btn--ghost"
-              href="https://github.com/Tools-n-Services/backlog-helper/blob/main/docs/00-product.md"
-              >Описание продукта</a
+            <a class="btn btn--ghost" href="https://github.com/Tools-n-Services/backlog-helper"
+              >Исходники на GitHub</a
             >
           </div>
 
           <p class="hero__stack">
-            Next.js · PostgreSQL · self-hosted · один клон на продукт
+            Next.js · PostgreSQL · self-hosted · один образ на все продукты
           </p>
 
           <div class="shot shot--raised hero__shot">
@@ -321,7 +318,21 @@
             </li>
             <li>
               <b>Вход без второй регистрации</b>
-              <span>Magic link, OAuth конфигом, SSO из основного продукта по токену.</span>
+              <span>Ссылка на почту, без пароля. Читать портал можно и без входа.</span>
+            </li>
+            <li>
+              <b>Настройка без кода</b>
+              <span
+                >Доски, статусы, поля форм, лимиты и фирменный цвет правятся
+                в админке и применяются сразу.</span
+              >
+            </li>
+            <li>
+              <b>Два языка и перевод</b>
+              <span
+                >Интерфейс на русском и английском, чужие обращения переводятся
+                с пометкой и кнопкой «показать оригинал».</span
+              >
             </li>
             <li>
               <b>SEO из коробки</b>
@@ -335,32 +346,32 @@
       <section id="start" style="border-top: 1px solid var(--line)">
         <div class="page">
           <p class="label">Запуск</p>
-          <h2>Клон под продукт, <b>обновления из апстрима</b></h2>
+          <h2>Установка мастером, <b>настройка в браузере</b></h2>
           <p class="lead" style="margin-top: 18px">
-            Один инстанс обслуживает один продукт. Логика остаётся общей и приезжает
-            обновлениями, а в клоне живут только конфиг, тексты и тема.
+            Один инстанс обслуживает один продукт: своя база, свой домен, свои
+            настройки. Образ при этом общий — форк нужен, только если меняется код.
           </p>
 
           <ol class="steps">
             <li>
-              <b>Склонировать</b>
+              <b>Поднять</b>
               <span
-                >Форк или клон, <code>pnpm install</code>, <code>pnpm dev</code> — портал
-                открывается сразу.</span
+                >Сервер с Docker и домен на него. <code>docker compose up -d</code> —
+                база, портал, воркер и прокси с сертификатом.</span
               >
             </li>
             <li>
-              <b>Поправить конфиг и тему</b>
+              <b>Пройти мастер</b>
               <span
-                >Доски и статусы — <code>config/</code>, цвета и шрифты —
-                <code>theme/tokens.css</code>, тексты — <code>content/</code>.</span
+                >Проверка среды, название и домен, набор досок и типов, пробное
+                письмо, владелец. Пять шагов.</span
               >
             </li>
             <li>
-              <b>Обновляться</b>
+              <b>Настроить под себя</b>
               <span
-                ><code>git merge upstream/main</code> — общая логика в
-                <code>src/core/</code> в клоне не правится.</span
+                >Доски, статусы, поля форм и оформление — в админке. Пересобирать
+                ничего не нужно.</span
               >
             </li>
           </ol>
@@ -378,15 +389,14 @@
               <summary>В каком состоянии проект?</summary>
               <div class="answer">
                 <p>
-                  Публичная часть и очередь триажа собраны и кликаются, доменные правила —
-                  настоящие: trending, поиск похожих, дедупликация голосов, SLA, лимиты.
-                  Данные пока приходят из фикстур: Postgres, настоящие мутации и письма —
-                  следующие итерации.
+                  Работает целиком: Postgres, вход по ссылке, письма, приём обращений
+                  и вложений, очередь триажа, бэклог, роадмап и changelog. Портал
+                  ставится мастером и настраивается в админке без правки кода.
                 </p>
                 <p>
-                  Прототип не выбрасывается: он собран на целевом стеке, и от продукта в
-                  нём отсутствует ровно один слой — источник данных за контрактом
-                  <code>src/queries/</code>.
+                  Чего пока нет: резервного копирования из коробки, удаления аккаунта
+                  с анонимизацией и виджета приёма ошибок. Всё это в плане и названо
+                  честно, а не спрятано.
                 </p>
               </div>
             </details>
@@ -412,8 +422,10 @@
               <div class="answer">
                 <p>
                   Нет, и это осознанно: в схеме нет <code>tenant_id</code>. Под каждый
-                  продукт — свой клон, своя база, свой домен. Платим за это обновлением N
-                  инстансов, выигрываем простую схему и полную свободу редизайна.
+                  продукт — свой инстанс, своя база, свой домен. Образ при этом общий:
+                  второй продукт поднимается той же командой с другим доменом.
+                  Платим обновлением N установок, выигрываем простую схему и полную
+                  изоляцию данных.
                 </p>
               </div>
             </details>
@@ -474,19 +486,17 @@
       <section class="dark">
         <div class="page">
           <p class="label">Дальше</p>
-          <h2>Заберите репозиторий <b>и разверните у себя</b></h2>
+          <h2>Разверните у себя <b>за пятнадцать минут</b></h2>
           <p class="lead">
-            Спецификация, модель данных, дизайн-бриф и план разработки лежат в
-            <code>docs/</code> — прочитать можно до первого клона.
+            Пошаговая инструкция, пользовательское руководство и описание того,
+            что настраивается без кода, — рядом. Прочитать можно до установки.
           </p>
           <div class="hero__actions">
             <a class="btn btn--onDark" href="https://github.com/Tools-n-Services/backlog-helper"
               >GitHub</a
             >
-            <a
-              class="btn btn--onDarkGhost"
-              href="https://github.com/Tools-n-Services/backlog-helper/tree/main/docs"
-              >Документация</a
+            <a class="btn btn--onDarkGhost" href="docs/11-manual.md"
+              >Инструкция</a
             >
           </div>
         </div>
